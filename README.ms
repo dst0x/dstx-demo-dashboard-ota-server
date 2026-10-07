@@ -1,1 +1,0 @@
-#Mertani OTA Server
