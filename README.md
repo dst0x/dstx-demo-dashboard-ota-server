@@ -1,4 +1,4 @@
-# STM32 & IoT OTA (Over-The-Air) Update Server
+# OTA (Over-The-Air) Server
 
 Backend server berbasis Node.js (Express) dan PostgreSQL yang dirancang untuk mengelola pembaruan firmware mikrokontroler secara nirkabel (OTA). Server ini mendukung unggahan file biner (.bin), kalkulasi checksum otomatis berbasis SHA-256, pengecekan versi perangkat, hingga penyediaan jalur unduhan file yang aman.
 
@@ -18,9 +18,9 @@ Backend server berbasis Node.js (Express) dan PostgreSQL yang dirancang untuk me
 
 Pastikan perangkat Anda telah terinstal perangkat lunak berikut:
 
-1. Node.js (Versi LTS direkomendasikan)
-2. Docker & Docker Compose (Untuk menjalankan PostgreSQL)
-3. Cloudflared CLI (Opsional, jika ingin mengekspos server ke internet publik)
+1. Node.js
+2. Docker & Docker Compose
+3. Cloudflared CLI
 
 ---
 
@@ -51,6 +51,77 @@ mertani_ota-server/
 ├── server.js
 └── README.md
 ```
+
+---
+
+## Struktur Database
+
+Database PostgreSQL pada proyek ini terdiri dari 2 tabel utama yang digunakan untuk menyimpan metadata firmware dan status perangkat:
+
+### 1. Tabel `firmwares`
+
+Tabel ini menyimpan data rilisan firmware yang tersedia untuk diunduh oleh perangkat IoT.
+
+```sql
+CREATE TABLE IF NOT EXISTS firmwares (
+    id SERIAL PRIMARY KEY,
+    version VARCHAR(50) NOT NULL,
+    hardware_target VARCHAR(100) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    file_size INTEGER NOT NULL,
+    checksum VARCHAR(255) NOT NULL,
+    release_notes TEXT,
+    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Penjelasan kolom:
+
+- `id`: ID unik firmware.
+- `version`: Versi firmware, contoh `1.0.0`.
+- `hardware_target`: Target perangkat, contoh `STM32G0B1`.
+- `file_path`: Lokasi file `.bin` yang tersimpan di server.
+- `file_size`: Ukuran file dalam byte.
+- `checksum`: Nilai SHA-256 hasil hash file.
+- `release_notes`: Catatan rilis atau perbaikan yang disertakan.
+- `upload_date`: Waktu upload firmware.
+
+### 2. Tabel `devices`
+
+Tabel ini menyimpan daftar perangkat yang sudah terdaftar dan informasi versi terakhir yang terpasang.
+
+```sql
+CREATE TABLE IF NOT EXISTS devices (
+    mac_address VARCHAR(50) PRIMARY KEY,
+    current_version VARCHAR(50),
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Penjelasan kolom:
+
+- `mac_address`: Identitas unik perangkat, biasanya alamat MAC.
+- `current_version`: Versi firmware yang saat ini dipakai perangkat.
+- `last_seen`: Waktu perangkat terakhir melakukan polling atau check-in.
+
+### Diagram Relasi Sederhana
+
+```text
++-------------------+       +-------------------+
+| devices           |       | firmwares         |
+|-------------------|       |-------------------|
+| mac_address       |       | id                |
+| current_version   |       | version           |
+| last_seen         |       | hardware_target   |
++-------------------+       | file_path         |
+                            | file_size         |
+                            | checksum          |
+                            | release_notes     |
+                            | upload_date       |
+                            +-------------------+
+```
+
+Relasi yang dipakai bersifat logis: satu perangkat bisa memeriksa firmware terbaru dari tabel `firmwares`, sedangkan `devices` hanya mencatat status perangkat saat ini.
 
 ---
 
