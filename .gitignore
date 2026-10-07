@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Local database (SQLite jika ada)
+data/
+*.sqlite
+
+# Firmware storage (file .bin lokal)
+storage/firmwares/*
+!storage/firmwares/.gitkeep
+
+# System files
+.DS_Store
+Thumbs.db
