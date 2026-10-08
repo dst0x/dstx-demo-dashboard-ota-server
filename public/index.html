@@ -3,82 +3,374 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mertani OTA - Admin Dashboard</title>
+    <title>OTA Firmware Server Hub</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        h2 { color: #333; margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        input[type="text"], input[type="file"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        :root {
+            --primary: #ea580c;
+            --primary-hover: #c2410c;
+            --bg-color: #ffffff;
+            --card-bg: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        header h1 span { color: var(--primary); }
+
+        .main-container {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        .card h3 { margin-top: 0; margin-bottom: 16px; font-size: 18px; color: var(--text-main); }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group.full { grid-column: span 2; }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-main);
+        }
+
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #ffffff;
+            font-size: 14px;
+            box-sizing: border-box;
+            color: var(--text-main);
+        }
+
+        input[type="file"] { font-size: 14px; color: var(--text-muted); }
+
         textarea { resize: vertical; height: 80px; }
-        button { background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
-        button:hover { background-color: #0056b3; }
-        #responseMessage { margin-top: 20px; padding: 10px; border-radius: 4px; display: none; }
-        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .semver-chips { display: flex; gap: 8px; margin-top: 6px; }
+
+        .chip {
+            background: #ffedd5;
+            color: #9a3412;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #fed7aa;
+        }
+        .chip:hover { background: #fed7aa; }
+
+        button.btn-primary {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 15px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button.btn-primary:hover { background-color: var(--primary-hover); }
+        button.btn-primary:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        #responseMessage {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .success { background-color: #f0fdf4; color: #166534; border: 1px solid #dcfce7; }
+        .error   { background-color: #fef2f2; color: #991b1b; border: 1px solid #fee2e2; }
+        .info    { background-color: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
+
+        .firmware-list { margin-top: 20px; }
+
+        .firmware-item {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .firmware-info h4 { margin: 0 0 6px 0; font-size: 15px; color: var(--text-main); }
+        .firmware-info p  { margin: 0 0 3px 0; font-size: 12px; color: var(--text-muted); }
+
+        .badge {
+            background: #ffedd5;
+            color: #c2410c;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+
+        .badge-mti {
+            background: #dcfce7;
+            color: #166534;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+
+        .btn-delete {
+            background: #fee2e2;
+            color: #991b1b;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .btn-delete:hover { background: #fecaca; }
+
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #1e40af;
+            margin-bottom: 20px;
+        }
+        .info-box strong { display: block; margin-bottom: 4px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Upload Firmware OTA</h2>
-    <form id="uploadForm">
-        <div class="form-group">
-            <label for="firmware">File Firmware (.bin):</label>
-            <input type="file" id="firmware" name="firmware" accept=".bin" required>
+<header>
+    <h1>OTA <span>Server Hub</span></h1>
+    <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">MTI2 STM32L4P5 · Format MTI2UPD1 v2</span>
+</header>
+
+<div class="main-container">
+
+    <div class="info-box">
+        <strong>Alur Otomatis</strong>
+        Upload file Release <code>.bin</code> dari STM32CubeIDE → Server memvalidasi binary dan membuat paket
+        <code>UPDATE.MTI</code> secara otomatis → Device mendownload file siap pakai.
+    </div>
+
+    <!-- Upload Form -->
+    <div class="card">
+        <h3>Unggah Biner Firmware Baru</h3>
+        <form id="uploadForm">
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label for="firmware">Berkas Biner Release STM32 (.bin)</label>
+                    <input type="file" id="firmware" name="firmware" accept=".bin" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="version">Versi SemVer (contoh: v1.0.1)</label>
+                    <input type="text" id="version" name="version" placeholder="v1.0.0" required>
+                    <div class="semver-chips">
+                        <span class="chip" onclick="fillVersion('v1.0.1')">+ v1.0.1 (Patch)</span>
+                        <span class="chip" onclick="fillVersion('v1.1.0')">+ v1.1.0 (Minor)</span>
+                        <span class="chip" onclick="fillVersion('v2.0.0')">+ v2.0.0 (Major)</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="hardware_target">Target Hardware</label>
+                    <select id="hardware_target" name="hardware_target" required>
+                        <option value="STM32L4P5RGT6">STM32L4P5RGT6 (MTI2)</option>
+                    </select>
+                </div>
+
+                <div class="form-group full">
+                    <label for="release_notes">Catatan Rilis / Changelog (Markdown)</label>
+                    <textarea id="release_notes" name="release_notes" placeholder="Deskripsi pembaruan sistem..."></textarea>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary" id="submitBtn">
+                Validasi & Package Firmware → UPDATE.MTI
+            </button>
+        </form>
+        <div id="responseMessage"></div>
+    </div>
+
+    <!-- Firmware List -->
+    <div class="card">
+        <h3>Repository Firmware Tersimpan</h3>
+        <div id="firmwareListContainer" class="firmware-list">
+            <p style="color: var(--text-muted); font-size: 13px;">Memuat daftar firmware...</p>
         </div>
-        <div class="form-group">
-            <label for="version">Versi Firmware (contoh: 1.0.1):</label>
-            <input type="text" id="version" name="version" placeholder="1.0.0" required>
-        </div>
-        <div class="form-group">
-            <label for="hardware_target">Hardware Target (contoh: STM32G0B1):</label>
-            <input type="text" id="hardware_target" name="hardware_target" placeholder="STM32G0B1" required>
-        </div>
-        <div class="form-group">
-            <label for="release_notes">Catatan Rilis (Release Notes):</label>
-            <textarea id="release_notes" name="release_notes" placeholder="Deskripsi pembaruan..."></textarea>
-        </div>
-        <button type="submit">Unggah Firmware</button>
-    </form>
-    <div id="responseMessage"></div>
+    </div>
 </div>
 
 <script>
-    const form = document.getElementById('uploadForm');
-    const responseMessage = document.getElementById('responseMessage');
+    function fillVersion(ver) {
+        document.getElementById('version').value = ver;
+    }
+
+    const form        = document.getElementById('uploadForm');
+    const submitBtn   = document.getElementById('submitBtn');
+    const responseMsg = document.getElementById('responseMessage');
+
+    async function loadFirmwares() {
+        const container = document.getElementById('firmwareListContainer');
+        container.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">Memuat riwayat firmware...</p>`;
+
+        try {
+            const res    = await fetch('/api/admin/firmwares');
+            const result = await res.json();
+
+            if (result.success && result.data.length > 0) {
+                container.innerHTML = '';
+                result.data.forEach(fw => {
+                    const date      = new Date(fw.upload_date).toLocaleString('id-ID');
+                    const mtiSize   = fw.mti_file_size ? `${(fw.mti_file_size / 1024).toFixed(1)} KB` : '-';
+                    const binSize   = `${(fw.file_size / 1024).toFixed(1)} KB`;
+                    const crc32str  = fw.payload_crc32 ? fw.payload_crc32 : '-';
+                    const sha256str = fw.checksum ? fw.checksum.substring(0, 16) + '…' : '-';
+                    const mtiReady  = fw.mti_file_path
+                        ? `<span class="badge-mti">UPDATE.MTI siap</span>`
+                        : `<span style="font-size:11px;color:#991b1b;">MTI tidak tersedia</span>`;
+
+                    container.innerHTML += `
+                        <div class="firmware-item">
+                            <div class="firmware-info">
+                                <h4>
+                                    Versi ${fw.version}
+                                    <span class="badge">${fw.hardware_target}</span>
+                                    ${mtiReady}
+                                </h4>
+                                <p><strong>Catatan:</strong> ${fw.release_notes || 'Tidak ada catatan'}</p>
+                                <p>
+                                    <strong>Payload CRC32:</strong> <code>0x${crc32str}</code> &nbsp;|&nbsp;
+                                    <strong>SHA-256 (MTI):</strong> <code>${sha256str}</code>
+                                </p>
+                                <p>
+                                    <strong>Ukuran .bin:</strong> ${binSize} &nbsp;|&nbsp;
+                                    <strong>Ukuran UPDATE.MTI:</strong> ${mtiSize}
+                                </p>
+                                <p style="color: #94a3b8; font-size: 11px; margin-top: 4px;">
+                                    Diunggah: ${date} &nbsp;|&nbsp;
+                                    Download: <a href="/api/ota/download/${fw.id}" style="color: var(--primary);">UPDATE.MTI #${fw.id}</a>
+                                </p>
+                            </div>
+                            <button class="btn-delete" onclick="deleteFirmware(${fw.id})">Hapus</button>
+                        </div>
+                    `;
+                });
+            } else {
+                container.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">Belum ada firmware yang diunggah ke repository.</p>`;
+            }
+        } catch (err) {
+            container.innerHTML = `<p style="color: #991b1b; font-size: 13px;">Gagal memuat daftar firmware dari server.</p>`;
+        }
+    }
+
+    async function deleteFirmware(id) {
+        if (!confirm(`Hapus firmware #${id} beserta file UPDATE.MTI-nya?`)) return;
+
+        try {
+            const res    = await fetch(`/api/admin/firmware/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (res.ok) {
+                alert(result.message);
+                loadFirmwares();
+            } else {
+                alert(`Gagal menghapus: ${result.error}`);
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan saat menghapus firmware.');
+        }
+    }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const formData = new FormData(form);
-        responseMessage.style.display = 'block';
-        responseMessage.className = '';
-        responseMessage.textContent = 'Mengunggah file...';
+
+        submitBtn.disabled    = true;
+        submitBtn.textContent = 'Memproses & packaging…';
+        responseMsg.style.display = 'block';
+        responseMsg.className     = 'info';
+        responseMsg.textContent   = 'Mengunggah, memvalidasi binary, dan membuat UPDATE.MTI…';
 
         try {
-            const response = await fetch('/api/admin/upload', {
-                method: 'POST',
-                body: formData
-            });
+            const res    = await fetch('/api/admin/upload', { method: 'POST', body: new FormData(form) });
+            const result = await res.json();
 
-            const result = await response.json();
-
-            if (response.ok) {
-                responseMessage.className = 'success';
-                responseMessage.innerHTML = `<strong>Berhasil!</strong><br>ID: ${result.data.id}<br>Checksum: ${result.data.checksum.substring(0, 16)}...`;
+            if (res.ok) {
+                const d = result.data;
+                responseMsg.className   = 'success';
+                responseMsg.innerHTML   =
+                    `<strong>Berhasil!</strong> ID: #${d.id} | Versi: ${d.version}<br>` +
+                    `Payload CRC32: <code>0x${d.payload_crc32}</code> | ` +
+                    `UPDATE.MTI: ${(d.mti_file_size / 1024).toFixed(1)} KB`;
                 form.reset();
+                loadFirmwares();
             } else {
-                responseMessage.className = 'error';
-                responseMessage.textContent = `Gagal: ${result.error || 'Terjadi kesalahan'}`;
+                responseMsg.className   = 'error';
+                responseMsg.textContent = `Gagal: ${result.error || 'Terjadi kesalahan sistem'}`;
             }
         } catch (err) {
-            responseMessage.className = 'error';
-            responseMessage.textContent = 'Gagal terhubung ke server.';
+            responseMsg.className   = 'error';
+            responseMsg.textContent = 'Gagal terhubung ke server backend.';
+        } finally {
+            submitBtn.disabled    = false;
+            submitBtn.textContent = 'Validasi & Package Firmware → UPDATE.MTI';
         }
     });
-</script>
 
+    loadFirmwares();
+</script>
 </body>
 </html>
