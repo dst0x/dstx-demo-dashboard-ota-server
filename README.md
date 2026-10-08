@@ -4,6 +4,18 @@ Backend server berbasis Node.js (Express) dan PostgreSQL yang dirancang untuk me
 
 ---
 
+## Tampilan Web
+
+### Login Administrator
+
+![Halaman login STM32 OTA Console](docs/images/login.png)
+
+### Dashboard OTA Server
+
+![Dashboard OTA Server Hub](docs/images/dashboard.png)
+
+---
+
 ## Fitur Utama
 
 - Upload Firmware (.bin): Dilengkapi validasi ekstensi file dan penyimpanan aman menggunakan multer.
