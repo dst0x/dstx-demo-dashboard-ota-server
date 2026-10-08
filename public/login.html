@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+  <title>Login Admin — STM32 OTA</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #f8fafc;
+      --panel-border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #ea580c;
+      --accent-hover: #c2410c;
+      --accent-soft: #ffedd5;
+      --danger: #991b1b;
+      --input: #ffffff;
+      --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      overflow-x: hidden;
+      padding: 24px;
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.55;
+      background-image:
+        linear-gradient(rgba(226, 232, 240, 0.65) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(226, 232, 240, 0.65) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black, transparent 90%);
+    }
+
+    .login-card {
+      position: relative;
+      width: min(100%, 430px);
+      padding: 36px;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 30px;
+    }
+
+    .brand-icon {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .brand-icon svg { width: 26px; height: 26px; }
+
+    .brand-name {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .brand-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(27px, 7vw, 34px);
+      line-height: 1.15;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      margin: 10px 0 28px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .field { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .input-wrap { position: relative; }
+
+    input {
+      width: 100%;
+      height: 50px;
+      padding: 0 46px 0 15px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      outline: 0;
+      color: var(--text);
+      background: var(--input);
+      font: inherit;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    input::placeholder { color: #64748b; }
+
+    input:focus {
+      border-color: var(--accent);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+    }
+
+    .input-icon,
+    .toggle-password {
+      position: absolute;
+      top: 50%;
+      right: 14px;
+      width: 20px;
+      height: 20px;
+      transform: translateY(-50%);
+      color: #718096;
+    }
+
+    .toggle-password {
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      cursor: pointer;
+      background: transparent;
+    }
+
+    .toggle-password:hover { color: var(--text); }
+    .toggle-password svg, .input-icon svg { width: 20px; height: 20px; }
+
+    .alert {
+      display: none;
+      margin-bottom: 18px;
+      padding: 11px 13px;
+      border: 1px solid #fee2e2;
+      border-radius: 8px;
+      color: #991b1b;
+      background: #fef2f2;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .alert.show { display: block; }
+
+    .submit-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      height: 50px;
+      margin-top: 8px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      color: #ffffff;
+      background: var(--accent);
+      font: inherit;
+      font-weight: 800;
+      transition: transform 150ms ease, filter 150ms ease, opacity 150ms ease;
+    }
+
+    .submit-button:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .submit-button:active { transform: translateY(0); }
+    .submit-button:disabled { cursor: wait; opacity: 0.7; transform: none; }
+
+    .spinner {
+      display: none;
+      width: 17px;
+      height: 17px;
+      border: 2px solid rgba(255, 255, 255, 0.38);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    .submit-button.loading .spinner { display: block; }
+    .submit-button.loading .button-icon { display: none; }
+
+    .button-icon { width: 18px; height: 18px; }
+
+    .footer {
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 480px) {
+      body { padding: 16px; }
+      .login-card { padding: 28px 22px; border-radius: 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="login-card">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="6" y="6" width="12" height="12" rx="2"/>
+          <path d="M9 1v3m6-3v3M9 20v3m6-3v3M1 9h3m-3 6h3m16-6h3m-3 6h3M9.5 9.5h5v5h-5z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="brand-name">STM32 OTA Console</p>
+        <div class="brand-status"><span class="status-dot"></span>Management server</div>
+      </div>
+    </div>
+
+    <h1>Selamat datang</h1>
+    <p class="subtitle">Masuk untuk mengelola rilis dan distribusi firmware perangkat.</p>
+
+    <div id="alert" class="alert" role="alert" aria-live="polite"></div>
+
+    <form id="loginForm" action="/api/auth/login" method="post" autocomplete="off">
+      <div class="field">
+        <label for="username">Username</label>
+        <div class="input-wrap">
+          <input id="username" name="username" type="text" autocomplete="off" placeholder="Masukkan username" required autofocus>
+          <span class="input-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <input id="password" name="password" type="password" autocomplete="new-password" placeholder="Masukkan password" required>
+          <button id="togglePassword" class="toggle-password" type="button" aria-label="Tampilkan password" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button id="submitButton" class="submit-button" type="submit">
+        <span class="spinner" aria-hidden="true"></span>
+        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M10 17l5-5-5-5m5 5H3m11-9h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/>
+        </svg>
+        <span id="buttonText">Masuk ke dashboard</span>
+      </button>
+    </form>
+
+    <p class="footer">Akses terbatas untuk administrator OTA yang berwenang.</p>
+  </main>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
+    const toggle = document.getElementById('togglePassword');
+    const submitButton = document.getElementById('submitButton');
+    const buttonText = document.getElementById('buttonText');
+    const alertBox = document.getElementById('alert');
+
+    function clearCredentials() {
+      form.reset();
+      username.value = '';
+      password.value = '';
+      password.type = 'password';
+      toggle.setAttribute('aria-pressed', 'false');
+      username.focus();
+    }
+
+    window.addEventListener('pageshow', () => {
+      clearCredentials();
+      window.setTimeout(clearCredentials, 100);
+    });
+
+    toggle.addEventListener('click', () => {
+      const isVisible = password.type === 'text';
+      password.type = isVisible ? 'password' : 'text';
+      toggle.setAttribute('aria-pressed', String(!isVisible));
+      toggle.setAttribute('aria-label', isVisible ? 'Tampilkan password' : 'Sembunyikan password');
+      password.focus();
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error')) {
+      alertBox.textContent = 'Username atau password tidak valid.';
+      alertBox.classList.add('show');
+    }
+
+    form.addEventListener('submit', (event) => {
+      if (window.location.protocol === 'file:') {
+        event.preventDefault();
+        alertBox.textContent = 'Halaman dibuka sebagai file lokal. Jalankan server lalu buka http://localhost:3000/login.';
+        alertBox.classList.add('show');
+        return;
+      }
+
+      alertBox.classList.remove('show');
+      submitButton.disabled = true;
+      submitButton.classList.add('loading');
+      buttonText.textContent = 'Memverifikasi...';
+    });
+  </script>
+</body>
+</html>

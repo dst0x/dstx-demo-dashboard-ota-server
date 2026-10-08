@@ -43,6 +43,20 @@
 
         header h1 span { color: var(--primary); }
 
+        .header-actions { display: flex; align-items: center; gap: 16px; }
+
+        .btn-logout {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            cursor: pointer;
+            color: var(--text-main);
+            background: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .btn-logout:hover { border-color: #fdba74; color: var(--primary-hover); }
+
         .main-container {
             max-width: 1000px;
             margin: 30px auto;
@@ -195,7 +209,12 @@
 
 <header>
     <h1>OTA <span>Server Hub</span></h1>
-    <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">MTI2 STM32L4P5 · Format MTI2UPD1 v2</span>
+    <div class="header-actions">
+        <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">MTI2 STM32L4P5 · Format MTI2UPD1 v2</span>
+        <form action="/api/auth/logout" method="post">
+            <button class="btn-logout" type="submit">Keluar</button>
+        </form>
+    </div>
 </header>
 
 <div class="main-container">
