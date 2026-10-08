@@ -1,44 +1,42 @@
-# OTA (Over-The-Air) Server
+# Mertani OTA Server
 
-Backend server berbasis Node.js (Express) dan PostgreSQL yang dirancang untuk mengelola pembaruan firmware mikrokontroler secara nirkabel (OTA). Server ini mendukung unggahan file biner (.bin), kalkulasi checksum otomatis berbasis SHA-256, pengecekan versi perangkat, hingga penyediaan jalur unduhan file yang aman.
-
----
-
-## Tampilan Web
-
-### Login Administrator
-
-![Halaman login STM32 OTA Console](docs/images/login.png)
-
-### Dashboard OTA Server
-
-![Dashboard OTA Server Hub](docs/images/dashboard.png)
+Firmware management backend for IoT microcontrollers. Handles binary uploads, SHA-256 integrity verification, device polling, and versioned update delivery — with Cloudflare Tunnels for public HTTPS access without port forwarding.
 
 ---
 
-## Fitur Utama
+## Web Interface
 
-- Upload Firmware (.bin): Dilengkapi validasi ekstensi file dan penyimpanan aman menggunakan multer.
-- SHA-256 Checksum Generator: Otomatis menghasilkan kode hash kriptografi untuk validasi integritas firmware di mikrokontroler.
-- Database PostgreSQL: Menyimpan metadata rilis firmware (version, hardware_target, checksum, file_size, release_notes) dan pelacakan perangkat.
-- OTA Polling & Download Endpoint: Endpoint khusus bagi perangkat IoT untuk mengecek pembaruan dan mengunduh file biner.
-- Cloudflare Tunnels Integration: Memungkinkan server lokal diakses secara aman dari internet publik tanpa memerlukan port forwarding router fisik.
+### Admin Login
 
----
+![STM32 OTA Console login page](docs/images/login.png)
 
-## Prasyarat Sistem
+### Dashboard
 
-Pastikan perangkat Anda telah terinstal perangkat lunak berikut:
-
-1. Node.js
-2. Docker & Docker Compose
-3. Cloudflared CLI
+![OTA Server Hub dashboard](docs/images/dashboard.png)
 
 ---
 
-## Struktur Proyek
+## Features
 
-```text
+- **Firmware Upload** — binary `.bin` file upload with extension validation and secure storage via `multer`
+- **SHA-256 Checksum** — automatic cryptographic hash generation for firmware integrity validation on the device side
+- **PostgreSQL Storage** — firmware metadata (version, hardware target, checksum, file size, release notes) and device tracking
+- **OTA Polling & Download** — dedicated endpoints for IoT devices to check for updates and download binaries
+- **Cloudflare Tunnels** — expose the local server to the public internet securely, no router port forwarding required
+
+---
+
+## Prerequisites
+
+- Node.js
+- Docker & Docker Compose
+- Cloudflared CLI
+
+---
+
+## Project Structure
+
+```
 mertani_ota-server/
 ├── src/
 │   ├── controllers/
@@ -55,9 +53,8 @@ mertani_ota-server/
 │   └── utils/
 │       └── hash_helper.js
 ├── storage/
-│   └── firmwares/       # Tempat penyimpanan file .bin fisik
+│   └── firmwares/       # Physical .bin file storage
 ├── .env
-├── .gitignore
 ├── docker-compose.yml
 ├── package.json
 ├── server.js
@@ -66,13 +63,11 @@ mertani_ota-server/
 
 ---
 
-## Struktur Database
+## Database Schema
 
-Database PostgreSQL pada proyek ini terdiri dari 2 tabel utama yang digunakan untuk menyimpan metadata firmware dan status perangkat:
+Two tables store firmware metadata and device state.
 
-### 1. Tabel `firmwares`
-
-Tabel ini menyimpan data rilisan firmware yang tersedia untuk diunduh oleh perangkat IoT.
+### `firmwares`
 
 ```sql
 CREATE TABLE IF NOT EXISTS firmwares (
@@ -87,20 +82,7 @@ CREATE TABLE IF NOT EXISTS firmwares (
 );
 ```
 
-Penjelasan kolom:
-
-- `id`: ID unik firmware.
-- `version`: Versi firmware, contoh `1.0.0`.
-- `hardware_target`: Target perangkat, contoh `STM32G0B1`.
-- `file_path`: Lokasi file `.bin` yang tersimpan di server.
-- `file_size`: Ukuran file dalam byte.
-- `checksum`: Nilai SHA-256 hasil hash file.
-- `release_notes`: Catatan rilis atau perbaikan yang disertakan.
-- `upload_date`: Waktu upload firmware.
-
-### 2. Tabel `devices`
-
-Tabel ini menyimpan daftar perangkat yang sudah terdaftar dan informasi versi terakhir yang terpasang.
+### `devices`
 
 ```sql
 CREATE TABLE IF NOT EXISTS devices (
@@ -110,47 +92,22 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 ```
 
-Penjelasan kolom:
-
-- `mac_address`: Identitas unik perangkat, biasanya alamat MAC.
-- `current_version`: Versi firmware yang saat ini dipakai perangkat.
-- `last_seen`: Waktu perangkat terakhir melakukan polling atau check-in.
-
-### Diagram Relasi Sederhana
-
-```text
-+-------------------+       +-------------------+
-| devices           |       | firmwares         |
-|-------------------|       |-------------------|
-| mac_address       |       | id                |
-| current_version   |       | version           |
-| last_seen         |       | hardware_target   |
-+-------------------+       | file_path         |
-                            | file_size         |
-                            | checksum          |
-                            | release_notes     |
-                            | upload_date       |
-                            +-------------------+
-```
-
-Relasi yang dipakai bersifat logis: satu perangkat bisa memeriksa firmware terbaru dari tabel `firmwares`, sedangkan `devices` hanya mencatat status perangkat saat ini.
+Relationship: devices poll `firmwares` for a newer version than `current_version`. A device is identified by its MAC address.
 
 ---
 
-## Langkah Instalasi & Pengaturan
+## Installation
 
-### 1. Clone atau Buat Direktori Proyek
-
-Masuk ke direktori proyek Anda, lalu instal dependensi Node.js yang diperlukan:
+### 1. Install dependencies
 
 ```bash
 npm install express multer dotenv pg
 npm install --save-dev nodemon
 ```
 
-### 2. Konfigurasi Environment (.env)
+### 2. Configure environment
 
-Buat file `.env` di root folder proyek dan sesuaikan konfigurasi berikut:
+Create `.env` in the project root:
 
 ```env
 PORT=3000
@@ -161,82 +118,77 @@ DB_PASSWORD=supersecret
 DB_NAME=ota_database
 ```
 
-### 3. Jalankan Database PostgreSQL via Docker
-
-Gunakan Docker Compose untuk menghidupkan wadah database PostgreSQL:
+### 3. Start PostgreSQL
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Inisialisasi Tabel Database
-
-Jalankan script migrasi untuk membuat tabel `firmwares` dan `devices` secara otomatis:
+### 4. Initialize database tables
 
 ```bash
 node src/database/init.js
 ```
 
-### 5. Menjalankan Server (Development Mode)
-
-Jalankan server menggunakan `nodemon` agar melakukan restart otomatis saat ada perubahan kode:
+### 5. Start the server
 
 ```bash
 npx nodemon server.js
 ```
 
-Server akan berjalan di `http://localhost:3000`.
+Server runs at `http://localhost:3000`.
 
 ---
 
-## Dokumentasi API Endpoint
+## API Reference
 
-### A. Admin API (Manajemen Firmware)
+### Admin — Firmware Management
 
-#### Upload Firmware
+**Upload firmware**
 
-- Method: `POST`
-- URL: `/api/admin/upload`
-- Body (form-data):
-  - `firmware`: File `.bin` (Type: File)
-  - `version`: `1.0.0` (Type: Text)
-  - `hardware_target`: `STM32G0B1` (Type: Text)
-  - `release_notes`: `Perbaikan bug sensor suhu` (Type: Text)
+```
+POST /api/admin/upload
+Content-Type: multipart/form-data
 
-### B. OTA API (Untuk Perangkat IoT / STM32)
+firmware        File (.bin)
+version         e.g. 1.0.0
+hardware_target e.g. STM32G0B1
+release_notes   e.g. Fix temperature sensor reading
+```
 
-#### Cek Ketersediaan Update
+### OTA — Device Endpoints
 
-- Method: `GET`
-- URL: `/api/ota/check?hardware_target=STM32G0B1&current_version=0.9.0`
-- Respons: Mengembalikan informasi versi terbaru, ukuran file, checksum SHA-256, dan tautan unduhan jika ditemukan versi yang lebih baru.
+**Check for update**
 
-#### Unduh File Firmware (.bin)
+```
+GET /api/ota/check?hardware_target=STM32G0B1&current_version=0.9.0
+```
 
-- Method: `GET`
-- URL: `/api/ota/download/:id`
-- Deskripsi: Mengunduh file biner fisik secara langsung berdasarkan ID firmware di database.
+Returns the latest version, file size, SHA-256 checksum, and download URL if a newer version exists.
+
+**Download firmware binary**
+
+```
+GET /api/ota/download/:id
+```
+
+Streams the `.bin` file directly by firmware database ID.
 
 ---
 
-## Publikasi ke Internet (Cloudflare Tunnel)
+## Public Deployment (Cloudflare Tunnel)
 
-Agar server lokal dapat diakses oleh perangkat IoT di luar jaringan lokal:
-
-1. Pastikan utilitas `cloudflared` sudah terinstal di sistem Anda.
-2. Jalankan Quick Tunnel atau Named Tunnel yang mengarah ke port lokal `3000`:
+To make the server reachable from IoT devices outside the local network:
 
 ```bash
 cloudflared tunnel run --url http://localhost:3000 mertani-ota-server
 ```
 
-3. Gunakan domain atau URL publik HTTPS yang dihasilkan di dalam kode mikrokontroler Anda.
+Use the resulting HTTPS URL in your microcontroller firmware.
 
 ---
 
-## Git Best Practices (.gitignore)
-
-Pastikan file sensitif dan direktori biner tidak ikut terunggah ke repository GitHub dengan membuat file `.gitignore` berisi:
+## .gitignore
 
 ```gitignore
 node_modules/
@@ -248,6 +200,10 @@ storage/firmwares/*
 
 ---
 
-## Ringkasan
+## Tech Stack
 
-Proyek ini cocok digunakan untuk deployment OTA firmware berbasis perangkat microcontroller seperti STM32, ESP32, atau board berbasis MCU lainnya. Dengan kombinasi PostgreSQL, Express, dan mekanisme checksum SHA-256, server ini memudahkan pengelolaan update firmware dalam skenario perangkat IoT yang terdistribusi.
+Node.js · Express · PostgreSQL · Docker Compose · Cloudflare Tunnels
+
+## License
+
+MIT
