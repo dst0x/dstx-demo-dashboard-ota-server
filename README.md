@@ -113,9 +113,9 @@ Create `.env` in the project root:
 PORT=3000
 DB_HOST=localhost
 DB_PORT=5433
-DB_USER=ota_admin
-DB_PASSWORD=supersecret
-DB_NAME=ota_database
+DB_USER=example_admin
+DB_PASSWORD=example_supersecret
+DB_NAME=example_database
 ```
 
 ### 3. Start PostgreSQL
