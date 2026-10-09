@@ -1,4 +1,4 @@
-# Mertani OTA Server
+# Demo Dashboard OTA Server
 
 Firmware management backend for IoT microcontrollers. Handles binary uploads, SHA-256 integrity verification, device polling, and versioned update delivery — with Cloudflare Tunnels for public HTTPS access without port forwarding.
 
@@ -37,7 +37,7 @@ Firmware management backend for IoT microcontrollers. Handles binary uploads, SH
 ## Project Structure
 
 ```
-mertani_ota-server/
+dstx-demo-dashboard-ota-server/
 ├── src/
 │   ├── controllers/
 │   │   ├── admin_controller.js
@@ -181,7 +181,7 @@ Streams the `.bin` file directly by firmware database ID.
 To make the server reachable from IoT devices outside the local network:
 
 ```bash
-cloudflared tunnel run --url http://localhost:3000 mertani-ota-server
+cloudflared tunnel run --url http://localhost:3000 <YOUR_TUNNEL_NAME>
 ```
 
 Use the resulting HTTPS URL in your microcontroller firmware.
