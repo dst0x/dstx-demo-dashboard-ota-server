@@ -4,6 +4,44 @@ const { packageFirmware } = require('../utils/mti_packager');
 const path = require('path');
 const fs = require('fs');
 
+let targetSchemaPromise;
+
+function ensureTargetSchema() {
+    if (!targetSchemaPromise) {
+        targetSchemaPromise = pool.query(`
+            CREATE TABLE IF NOT EXISTS ota_devices (
+                devid       VARCHAR(20) PRIMARY KEY,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS firmware_targets (
+                firmware_id INTEGER NOT NULL REFERENCES firmwares(id) ON DELETE CASCADE,
+                devid       VARCHAR(20) NOT NULL,
+                PRIMARY KEY (firmware_id, devid)
+            );
+        `).catch(error => {
+            targetSchemaPromise = null;
+            throw error;
+        });
+    }
+    return targetSchemaPromise;
+}
+
+function parseTargetDevids(value) {
+    const devids = [...new Set(
+        String(value || '')
+            .split(/[\s,]+/)
+            .map(item => item.trim())
+            .filter(Boolean)
+    )];
+
+    if (devids.length === 0 || devids.some(devid => devid !== '*' && !/^[1-9]\d{0,19}$/.test(devid))) {
+        return null;
+    }
+    return devids;
+}
+
 const uploadFirmware = async (req, res) => {
     let binPath = null;
     let mtiPath = null;
@@ -14,11 +52,14 @@ const uploadFirmware = async (req, res) => {
         }
 
         const { version, hardware_target, release_notes } = req.body;
+        const targetDevids = parseTargetDevids(req.body.target_devids);
         binPath = req.file.path;
 
-        if (!version || !hardware_target) {
+        if (!version || !hardware_target || !targetDevids) {
             fs.unlinkSync(binPath);
-            return res.status(400).json({ error: 'Version dan hardware_target wajib diisi' });
+            return res.status(400).json({
+                error: 'Version, hardware_target, dan minimal satu target devid wajib diisi',
+            });
         }
 
         const binBuffer = fs.readFileSync(binPath);
@@ -55,11 +96,33 @@ const uploadFirmware = async (req, res) => {
             release_notes || null,
         ];
 
-        const result = await pool.query(query, values);
+        await ensureTargetSchema();
+        const client = await pool.connect();
+        let result;
+        try {
+            await client.query('BEGIN');
+            result = await client.query(query, values);
+            const firmwareId = result.rows[0].id;
+
+            for (const devid of targetDevids) {
+                await client.query(
+                    `INSERT INTO firmware_targets (firmware_id, devid)
+                     VALUES ($1, $2)
+                     ON CONFLICT DO NOTHING`,
+                    [firmwareId, devid]
+                );
+            }
+            await client.query('COMMIT');
+        } catch (dbError) {
+            await client.query('ROLLBACK');
+            throw dbError;
+        } finally {
+            client.release();
+        }
 
         res.status(201).json({
             message: 'Firmware berhasil diunggah dan dipackage',
-            data: result.rows[0],
+            data: { ...result.rows[0], target_devids: targetDevids },
         });
     } catch (error) {
         try { if (binPath && fs.existsSync(binPath)) fs.unlinkSync(binPath); } catch (_) {}
@@ -71,7 +134,18 @@ const uploadFirmware = async (req, res) => {
 
 const getAllFirmwares = async (req, res) => {
     try {
-        const query = 'SELECT * FROM firmwares ORDER BY upload_date DESC;';
+        await ensureTargetSchema();
+        const query = `
+            SELECT f.*,
+                   COALESCE(
+                       ARRAY_AGG(t.devid ORDER BY t.devid) FILTER (WHERE t.devid IS NOT NULL),
+                       ARRAY[]::varchar[]
+                   ) AS target_devids
+            FROM firmwares f
+            LEFT JOIN firmware_targets t ON t.firmware_id = f.id
+            GROUP BY f.id
+            ORDER BY f.upload_date DESC;
+        `;
         const result = await pool.query(query);
         res.json({ success: true, data: result.rows });
     } catch (error) {

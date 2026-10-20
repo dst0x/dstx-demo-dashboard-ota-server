@@ -18,19 +18,19 @@ Firmware management backend for IoT microcontrollers. Handles binary uploads, SH
 
 ## Features
 
-- **Firmware Upload** — binary `.bin` file upload with extension validation and secure storage via `multer`
-- **SHA-256 Checksum** — automatic cryptographic hash generation for firmware integrity validation on the device side
-- **PostgreSQL Storage** — firmware metadata (version, hardware target, checksum, file size, release notes) and device tracking
-- **OTA Polling & Download** — dedicated endpoints for IoT devices to check for updates and download binaries
-- **Cloudflare Tunnels** — expose the local server to the public internet securely, no router port forwarding required
+- Upload Firmware (.bin): Dilengkapi validasi ekstensi file dan penyimpanan aman menggunakan multer.
+- SHA-256 Checksum Generator: Otomatis menghasilkan kode hash kriptografi untuk validasi integritas firmware di mikrokontroler.
+- Database PostgreSQL: Menyimpan metadata rilis firmware (version, hardware_target, checksum, file_size, release_notes) dan pelacakan perangkat.
+- OTA Polling & Download Endpoint: Endpoint khusus bagi perangkat IoT untuk mengecek pembaruan dan mengunduh file biner.
 
 ---
 
 ## Prerequisites
 
-- Node.js
-- Docker & Docker Compose
-- Cloudflared CLI
+Pastikan perangkat Anda telah terinstal perangkat lunak berikut:
+
+1. Node.js
+2. Docker & Docker Compose
 
 ---
 
@@ -150,29 +150,55 @@ Server runs at `http://localhost:3000`.
 POST /api/admin/upload
 Content-Type: multipart/form-data
 
-firmware        File (.bin)
-version         e.g. 1.0.0
-hardware_target e.g. STM32G0B1
-release_notes   e.g. Fix temperature sensor reading
+### B. OTA API (Untuk Perangkat IoT / STM32)
+
+#### Cek Ketersediaan Update
+
+- Method: `GET`
+- URL: `/api/ota/check?devid=1734567890`
+- Query wajib: `devid` berupa UNIX ID unik milik device
+- Query opsional: `hardware_target` dan `current_version`
+- Respons:
+
+```json
+{
+  "devid": "1734567890",
+  "update_id": "1",
+  "update_available": true,
+  "version": "v2.0.3"
+}
 ```
 
-### OTA — Device Endpoints
+Jika `current_version` diberikan, `update_available` bernilai `false` ketika versinya sama dengan rilis terbaru. Server hanya memilih firmware yang ditargetkan ke `devid` tersebut atau firmware dengan target `*`.
 
-**Check for update**
+Setelah server menerima ACK dengan `download_status: true`, pemanggilan check berikutnya mengembalikan `update_available: false` hanya untuk `devid` tersebut. Device lain tetap memiliki statusnya sendiri.
 
+#### Kirim ACK Setelah Download
+
+- Method: `POST`
+- URL: `/api/ota/ack`
+- Header: `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "devid": "1734567890",
+  "update_id": "1",
+  "download_status": true
+}
 ```
-GET /api/ota/check?hardware_target=STM32G0B1&current_version=0.9.0
-```
 
-Returns the latest version, file size, SHA-256 checksum, and download URL if a newer version exists.
+Nilai `download_status` wajib berupa boolean JSON (`true` atau `false`), bukan string.
 
-**Download firmware binary**
+#### Unduh Firmware Terbaru
 
-```
-GET /api/ota/download/:id
-```
+- Method: `GET`
+- URL: `/api/ota/download/latest?devid=1734567890`
+- Query wajib: `devid`
+- Query opsional: `hardware_target`
+- Deskripsi: Mengunduh paket `UPDATE.MTI` terbaru yang ditargetkan ke device tersebut.
 
-Streams the `.bin` file directly by firmware database ID.
+Saat upload dari dashboard, kolom **Target Device ID** menerima satu atau beberapa `devid` yang dipisahkan koma. Gunakan target `*` hanya bila firmware memang harus tersedia untuk seluruh device.
 
 ---
 

@@ -253,6 +253,15 @@
                 </div>
 
                 <div class="form-group full">
+                    <label for="target_devids">Target Device ID (devid)</label>
+                    <input type="text" id="target_devids" name="target_devids"
+                           placeholder="Contoh: 1734567890, 1734567891" required>
+                    <p style="margin: 6px 0 0; color: var(--text-muted); font-size: 11px;">
+                        Pisahkan beberapa devid dengan koma. Gunakan <code>*</code> hanya untuk update ke seluruh device.
+                    </p>
+                </div>
+
+                <div class="form-group full">
                     <label for="release_notes">Catatan Rilis / Changelog (Markdown)</label>
                     <textarea id="release_notes" name="release_notes" placeholder="Deskripsi pembaruan sistem..."></textarea>
                 </div>
@@ -297,6 +306,9 @@
                     const date      = new Date(fw.upload_date).toLocaleString('id-ID');
                     const mtiSize   = fw.mti_file_size ? `${(fw.mti_file_size / 1024).toFixed(1)} KB` : '-';
                     const binSize   = `${(fw.file_size / 1024).toFixed(1)} KB`;
+                    const targets   = Array.isArray(fw.target_devids) && fw.target_devids.length
+                        ? fw.target_devids.join(', ')
+                        : 'Belum ditargetkan';
                     const crc32str  = fw.payload_crc32 ? fw.payload_crc32 : '-';
                     const sha256str = fw.checksum ? fw.checksum.substring(0, 16) + '…' : '-';
                     const mtiReady  = fw.mti_file_path
@@ -320,6 +332,7 @@
                                     <strong>Ukuran .bin:</strong> ${binSize} &nbsp;|&nbsp;
                                     <strong>Ukuran UPDATE.MTI:</strong> ${mtiSize}
                                 </p>
+                                <p><strong>Target devid:</strong> <code>${targets}</code></p>
                                 <p style="color: #94a3b8; font-size: 11px; margin-top: 4px;">
                                     Diunggah: ${date} &nbsp;|&nbsp;
                                     Download: <a href="/api/ota/download/${fw.id}" style="color: var(--primary);">UPDATE.MTI #${fw.id}</a>

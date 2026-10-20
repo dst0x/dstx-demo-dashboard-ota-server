@@ -26,6 +26,35 @@ const createTables = async () => {
             current_version VARCHAR(50),
             last_seen       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS ota_devices (
+            devid       VARCHAR(20) PRIMARY KEY,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS firmware_targets (
+            firmware_id INTEGER NOT NULL REFERENCES firmwares(id) ON DELETE CASCADE,
+            devid       VARCHAR(20) NOT NULL,
+            PRIMARY KEY (firmware_id, devid)
+        );
+
+        CREATE TABLE IF NOT EXISTS ota_download_acks (
+            id              BIGSERIAL PRIMARY KEY,
+            devid           VARCHAR(20),
+            firmware_id     INTEGER NOT NULL REFERENCES firmwares(id) ON DELETE CASCADE,
+            download_status BOOLEAN NOT NULL,
+            acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        ALTER TABLE ota_download_acks
+            ADD COLUMN IF NOT EXISTS devid VARCHAR(20);
+
+        CREATE INDEX IF NOT EXISTS idx_ota_download_acks_firmware_id
+            ON ota_download_acks(firmware_id);
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ota_download_acks_device_firmware
+            ON ota_download_acks(devid, firmware_id);
     `;
 
     try {

@@ -3,6 +3,52 @@ const { packageFirmware } = require('../utils/mti_packager');
 const path = require('path');
 const fs = require('fs');
 
+let otaSchemaPromise;
+
+function ensureOtaSchema() {
+    if (!otaSchemaPromise) {
+        otaSchemaPromise = pool.query(`
+            CREATE TABLE IF NOT EXISTS ota_devices (
+                devid       VARCHAR(20) PRIMARY KEY,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_seen   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS firmware_targets (
+                firmware_id INTEGER NOT NULL REFERENCES firmwares(id) ON DELETE CASCADE,
+                devid       VARCHAR(20) NOT NULL,
+                PRIMARY KEY (firmware_id, devid)
+            );
+
+            CREATE TABLE IF NOT EXISTS ota_download_acks (
+                id              BIGSERIAL PRIMARY KEY,
+                devid           VARCHAR(20),
+                firmware_id     INTEGER NOT NULL REFERENCES firmwares(id) ON DELETE CASCADE,
+                download_status BOOLEAN NOT NULL,
+                acknowledged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            ALTER TABLE ota_download_acks
+                ADD COLUMN IF NOT EXISTS devid VARCHAR(20);
+
+            CREATE INDEX IF NOT EXISTS idx_ota_download_acks_firmware_id
+                ON ota_download_acks(firmware_id);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_ota_download_acks_device_firmware
+                ON ota_download_acks(devid, firmware_id);
+        `).catch(error => {
+            otaSchemaPromise = null;
+            throw error;
+        });
+    }
+    return otaSchemaPromise;
+}
+
+function normalizeDevid(value) {
+    const devid = String(value || '').trim();
+    return /^[1-9]\d{0,19}$/.test(devid) ? devid : null;
+}
+
 /**
  * Ensures a firmware record has a valid .mti package file.
  * For records uploaded before packaging was introduced, generates the package
@@ -54,43 +100,110 @@ async function ensureMtiPackage(row) {
 
 const checkUpdate = async (req, res) => {
     const { hardware_target, current_version } = req.query;
+    const devid = normalizeDevid(req.query.devid);
 
-    if (!hardware_target || !current_version) {
-        return res.status(400).json({ error: 'Parameter hardware_target dan current_version wajib diisi' });
+    if (!devid) {
+        return res.status(400).json({ error: 'Parameter devid wajib berupa angka UNIX ID yang valid' });
     }
 
     try {
-        const query = `
-            SELECT id, version, mti_file_size, file_size, checksum, payload_crc32, release_notes
-            FROM firmwares
-            WHERE hardware_target = $1
-            ORDER BY id DESC LIMIT 1;
-        `;
-        const result = await pool.query(query, [hardware_target]);
+        await ensureOtaSchema();
+        await pool.query(
+            `INSERT INTO ota_devices (devid, last_seen)
+             VALUES ($1, CURRENT_TIMESTAMP)
+             ON CONFLICT (devid) DO UPDATE SET last_seen = CURRENT_TIMESTAMP`,
+            [devid]
+        );
+
+        const result = await pool.query(
+            `SELECT f.id, f.version,
+                    EXISTS (
+                        SELECT 1
+                        FROM ota_download_acks a
+                        WHERE a.firmware_id = f.id
+                          AND a.devid = $1
+                          AND a.download_status = TRUE
+                    ) AS download_acknowledged
+             FROM firmwares f
+             WHERE EXISTS (
+                       SELECT 1 FROM firmware_targets t
+                       WHERE t.firmware_id = f.id
+                         AND (t.devid = $1 OR t.devid = '*')
+                   )
+               AND ($2::varchar IS NULL OR f.hardware_target = $2)
+             ORDER BY f.id DESC LIMIT 1`,
+            [devid, hardware_target || null]
+        );
 
         if (result.rows.length === 0) {
-            return res.json({ update_available: false, message: 'Belum ada rilis untuk perangkat ini' });
-        }
-
-        const latest = result.rows[0];
-
-        if (latest.version !== current_version) {
             return res.json({
-                update_available: true,
-                version:          latest.version,
-                file_size:        latest.mti_file_size || latest.file_size,
-                checksum:         latest.checksum,
-                payload_crc32:    latest.payload_crc32,
-                download_url:     `/api/ota/download/${latest.id}`,
-                download_url_stable: `/api/ota/download/latest/${hardware_target}`,
-                release_notes:    latest.release_notes,
+                devid,
+                update_id: null,
+                update_available: false,
+                version: null,
             });
         }
 
-        return res.json({ update_available: false });
+        const latest = result.rows[0];
+        const versionIsNew = current_version ? latest.version !== current_version : true;
+        return res.json({
+            devid,
+            update_id: String(latest.id),
+            update_available: versionIsNew && !latest.download_acknowledged,
+            version: latest.version,
+        });
     } catch (error) {
         console.error('Error saat cek update:', error);
         res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+    }
+};
+
+const acknowledgeDownload = async (req, res) => {
+    const { update_id, download_status } = req.body;
+    const devid = normalizeDevid(req.body.devid);
+    const firmwareId = Number(update_id);
+
+    if (!devid || !Number.isInteger(firmwareId) || firmwareId <= 0 || typeof download_status !== 'boolean') {
+        return res.status(400).json({
+            error: 'devid, update_id, dan download_status wajib diisi dengan format yang valid',
+        });
+    }
+
+    try {
+        await ensureOtaSchema();
+        const result = await pool.query(
+            `INSERT INTO ota_download_acks (devid, firmware_id, download_status, acknowledged_at)
+             SELECT $1, f.id, $3, CURRENT_TIMESTAMP
+             FROM firmwares f
+             WHERE f.id = $2
+               AND EXISTS (
+                   SELECT 1 FROM firmware_targets t
+                   WHERE t.firmware_id = f.id
+                     AND (t.devid = $1 OR t.devid = '*')
+               )
+             ON CONFLICT (devid, firmware_id)
+             DO UPDATE SET download_status = EXCLUDED.download_status,
+                           acknowledged_at = CURRENT_TIMESTAMP
+             RETURNING id`,
+            [devid, firmwareId, download_status]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Firmware tidak ditemukan atau tidak ditargetkan ke devid ini' });
+        }
+
+        return res.status(201).json({
+            devid,
+            update_id: String(firmwareId),
+            download_status,
+            acknowledged: true,
+        });
+    } catch (error) {
+        if (error.code === '23503') {
+            return res.status(404).json({ error: `Firmware update_id=${firmwareId} tidak ditemukan` });
+        }
+        console.error('Error saat menyimpan ACK OTA:', error);
+        return res.status(500).json({ error: 'Terjadi kesalahan pada server' });
     }
 };
 
@@ -126,18 +239,34 @@ const downloadFirmware = async (req, res) => {
 };
 
 const downloadLatest = async (req, res) => {
-    const { hardware_target } = req.params;
+    const hardwareTarget = req.params.hardware_target || req.query.hardware_target;
+    const devid = normalizeDevid(req.query.devid);
+
+    if (!devid) {
+        return res.status(400).json({ error: 'Parameter devid wajib berupa angka UNIX ID yang valid' });
+    }
 
     try {
+        await ensureOtaSchema();
         const result = await pool.query(
-            `SELECT id, file_path, mti_file_path, version
-             FROM firmwares WHERE hardware_target = $1
-             ORDER BY id DESC LIMIT 1`,
-            [hardware_target]
+            `SELECT f.id, f.file_path, f.mti_file_path, f.version
+             FROM firmwares f
+             WHERE EXISTS (
+                       SELECT 1 FROM firmware_targets t
+                       WHERE t.firmware_id = f.id
+                         AND (t.devid = $1 OR t.devid = '*')
+                   )
+               AND ($2::varchar IS NULL OR f.hardware_target = $2)
+             ORDER BY f.id DESC LIMIT 1`,
+            [devid, hardwareTarget || null]
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: `Tidak ada firmware untuk hardware_target=${hardware_target}` });
+            return res.status(404).json({
+                error: hardwareTarget
+                    ? `Tidak ada firmware untuk hardware_target=${hardwareTarget}`
+                    : 'Belum ada firmware yang tersedia',
+            });
         }
 
         const row = result.rows[0];
@@ -157,4 +286,4 @@ const downloadLatest = async (req, res) => {
     }
 };
 
-module.exports = { checkUpdate, downloadFirmware, downloadLatest };
+module.exports = { acknowledgeDownload, checkUpdate, downloadFirmware, downloadLatest };
