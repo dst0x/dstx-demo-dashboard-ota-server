@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTA Firmware Server Hub</title>
+    <title>OTA Mertani</title>
     <style>
         :root {
             --primary: #ea580c;
@@ -208,9 +208,9 @@
 <body>
 
 <header>
-    <h1>OTA <span>Server Hub</span></h1>
+    <h1>OTA <span>Mertani</span></h1>
     <div class="header-actions">
-        <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">MTI2 STM32L4P5 · Format MTI2UPD1 v2</span>
+        <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">MTI2</span>
         <form action="/api/auth/logout" method="post">
             <button class="btn-logout" type="submit">Keluar</button>
         </form>
@@ -236,39 +236,39 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="version">Versi SemVer (contoh: v1.0.1)</label>
+                    <label for="version">Versi</label>
                     <input type="text" id="version" name="version" placeholder="v1.0.0" required>
                     <div class="semver-chips">
-                        <span class="chip" onclick="fillVersion('v1.0.1')">+ v1.0.1 (Patch)</span>
-                        <span class="chip" onclick="fillVersion('v1.1.0')">+ v1.1.0 (Minor)</span>
-                        <span class="chip" onclick="fillVersion('v2.0.0')">+ v2.0.0 (Major)</span>
+                        <span class="chip" onclick="fillVersion('v1.0.1')">v1.0.0</span>
+                        <span class="chip" onclick="fillVersion('v1.1.0')">v1.1.0</span>
+                        <span class="chip" onclick="fillVersion('v2.0.0')">v2.0.0</span>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label for="hardware_target">Target Hardware</label>
                     <select id="hardware_target" name="hardware_target" required>
-                        <option value="STM32L4P5RGT6">STM32L4P5RGT6 (MTI2)</option>
+                        <option value="STM32L4P5RGT6">MTI2</option>
                     </select>
                 </div>
 
                 <div class="form-group full">
-                    <label for="target_devids">Target Device ID (devid)</label>
+                    <label for="target_devids">Target Device</label>
                     <input type="text" id="target_devids" name="target_devids"
-                           placeholder="Contoh: 1734567890, 1734567891" required>
+                           placeholder="MTI-XXXYYYYZZZZ, MTI-TESTTTTXXXX" required>
                     <p style="margin: 6px 0 0; color: var(--text-muted); font-size: 11px;">
                         Pisahkan beberapa devid dengan koma. Gunakan <code>*</code> hanya untuk update ke seluruh device.
                     </p>
                 </div>
 
                 <div class="form-group full">
-                    <label for="release_notes">Catatan Rilis / Changelog (Markdown)</label>
+                    <label for="release_notes">Catatan Rilis</label>
                     <textarea id="release_notes" name="release_notes" placeholder="Deskripsi pembaruan sistem..."></textarea>
                 </div>
             </div>
 
             <button type="submit" class="btn-primary" id="submitBtn">
-                Validasi & Package Firmware → UPDATE.MTI
+                SEND
             </button>
         </form>
         <div id="responseMessage"></div>
@@ -276,7 +276,7 @@
 
     <!-- Firmware List -->
     <div class="card">
-        <h3>Repository Firmware Tersimpan</h3>
+        <h3>Firmware Tersimpan</h3>
         <div id="firmwareListContainer" class="firmware-list">
             <p style="color: var(--text-muted); font-size: 13px;">Memuat daftar firmware...</p>
         </div>
