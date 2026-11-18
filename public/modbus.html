@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus Terminal · OTA Mertani</title>
+    <link rel="stylesheet" href="/navigation.css">
+    <style>
+        :root {
+            --primary: #ea580c;
+            --primary-hover: #c2410c;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --card-bg: #f8fafc;
+            --term-bg: #0d1117;
+            --term-text: #e6edf3;
+            --term-tx: #ea580c;
+            --term-rx: #e6edf3;
+            --term-err: #f85149;
+            --term-ts: #8b949e;
+            --term-addr: #d2a8ff;
+            --term-func: #ffa657;
+            --term-reg: #79c0ff;
+            --term-val: #56d364;
+            --term-crc: #8b949e;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--text-main); background: #fff; font-family: 'Segoe UI', system-ui, sans-serif; }
+        header { display: flex; align-items: center; justify-content: space-between; padding: 20px 30px; border-bottom: 1px solid var(--border-color); background: #fff; }
+        header h1 { display: flex; gap: 10px; margin: 0; font-size: 20px; align-items: center; }
+        header h1 span { color: var(--primary); }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .btn { padding: 8px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-color); background: #fff; color: var(--text-main); }
+        .btn:hover { border-color: #fdba74; color: var(--primary-hover); }
+        .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
+        .btn-danger { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block; }
+        .status-dot.live { background: #22c55e; box-shadow: 0 0 6px #22c55e; animation: pulse 1.8s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        .main { max-width: 1200px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 16px; }
+
+        .panel { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .panel-head { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .panel-head svg { width: 16px; height: 16px; color: var(--primary); flex-shrink: 0; }
+        .panel-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* Send command */
+        .send-grid { display: grid; grid-template-columns: 160px 1fr 1fr; gap: 10px; align-items: end; }
+        @media (max-width: 768px) { .send-grid { grid-template-columns: 1fr; } }
+        .field label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+        .field input, .field select {
+            width: 100%; padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 13px; font-family: 'Consolas', monospace; background: #fff; color: var(--text-main);
+        }
+        .field input:focus, .field select:focus { outline: none; border-color: var(--primary); }
+
+        /* Builder row */
+        .builder-row { display: grid; grid-template-columns: 100px 1fr 1fr 1fr; gap: 8px; align-items: end; }
+        @media (max-width: 768px) { .builder-row { grid-template-columns: 1fr 1fr; } }
+
+        .frame-preview {
+            background: var(--term-bg); border-radius: 7px; padding: 10px 14px;
+            font-family: 'Consolas', monospace; font-size: 13px;
+            display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-height: 40px;
+        }
+
+        /* History table */
+        .history-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border-color); white-space: nowrap; }
+        td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); font-family: 'Consolas', monospace; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f1f5f9; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .badge-pending  { background: #fef3c7; color: #92400e; }
+        .badge-sent     { background: #dbeafe; color: #1e40af; }
+        .badge-done     { background: #dcfce7; color: #166534; }
+        .badge-timeout  { background: #fee2e2; color: #991b1b; }
+        .badge-error    { background: #fee2e2; color: #991b1b; }
+        .badge-cancelled{ background: #f1f5f9; color: #64748b; }
+        .resp-ok  { color: var(--term-tx); }
+        .resp-err { color: var(--term-err); }
+        .empty-row td { text-align: center; color: var(--text-muted); padding: 24px; font-family: inherit; }
+
+        /* Live monitor terminal */
+        .terminal-wrap { border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
+        .terminal-header { background: #161b22; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .terminal-title { font-size: 12px; font-weight: 600; color: #8b949e; letter-spacing: .5px; }
+        .terminal-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .terminal-controls select, .terminal-controls input {
+            padding: 4px 8px; border-radius: 5px; font-size: 11px; border: 1px solid #30363d;
+            background: #21262d; color: #8b949e;
+        }
+        .terminal-controls button {
+            padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer;
+            border: 1px solid #30363d; background: #21262d; color: #8b949e;
+        }
+        .terminal-controls button:hover { background: #30363d; color: #e6edf3; }
+        #terminal { background: var(--term-bg); padding: 14px 16px; height: 320px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 12.5px; line-height: 1.6; }
+        .t-row { display: flex; gap: 10px; align-items: flex-start; padding: 1px 0; }
+        .t-ts { color: var(--term-ts); min-width: 76px; flex-shrink: 0; }
+        .t-devid { color: #d2a8ff; min-width: 110px; flex-shrink: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+        .t-dir { min-width: 30px; flex-shrink: 0; font-weight: 700; font-size: 11px; }
+        .t-dir.tx { color: var(--term-tx); }
+        .t-dir.rx { color: var(--term-rx); }
+        .t-frames { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+        .t-byte { padding: 1px 5px; border-radius: 3px; }
+        .b-addr { background: rgba(210,168,255,.15); color: var(--term-addr); }
+        .b-func { background: rgba(255,166,87,.15); color: var(--term-func); }
+        .b-reg  { background: rgba(121,192,255,.12); color: var(--term-reg); }
+        .b-val  { background: rgba(86,211,100,.12); color: var(--term-val); }
+        .b-crc  { background: rgba(139,148,158,.1); color: var(--term-crc); }
+        .b-raw  { color: #e6edf3; }
+        .t-parsed { font-size: 11px; color: var(--term-ts); font-style: italic; }
+        .t-system { color: #8b949e; font-style: italic; }
+        .t-system.ok { color: var(--term-tx); }
+        .t-empty { color: #30363d; text-align: center; padding: 50px 0; font-size: 13px; }
+
+        /* Inspector */
+        .panels-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 768px) { .panels-2 { grid-template-columns: 1fr; } }
+        .crc-result { background: var(--term-bg); border-radius: 7px; padding: 10px 14px; font-family: 'Consolas', monospace; font-size: 12px; white-space: pre; color: var(--term-text); }
+        .conn-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .legend { display: flex; gap: 12px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #8b949e; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+        /* Mode tabs */
+        .mode-tabs { display: flex; gap: 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+        .mode-tab { flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; background: #fff; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 7px; transition: all 120ms; }
+        .mode-tab:not(:last-child) { border-right: 1px solid var(--border-color); }
+        .mode-tab.active { background: var(--primary); color: #fff; }
+        .mode-tab:not(.active):hover { background: #fff7ed; color: var(--primary); }
+        .mode-panel { display: none; }
+        .mode-panel.active { display: flex; flex-direction: column; gap: 12px; }
+
+        /* Serial port connection bar */
+        .port-bar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .port-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; background: var(--card-bg); border: 1px solid var(--border-color); }
+        .port-status.connected { background: #dcfce7; border-color: #86efac; color: #166534; }
+        .port-status.disconnected { color: var(--text-muted); }
+
+        /* Direct send row */
+        .direct-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .direct-row .field { flex: 1; min-width: 120px; }
+
+        /* Raw terminal */
+        #rawTerm { background: var(--term-bg); padding: 10px 14px; height: 160px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.6; border-radius: 7px; }
+        .raw-tx { color: var(--term-tx); }
+        .raw-rx { color: var(--term-rx); }
+        .raw-err { color: var(--term-err); }
+        .raw-sys { color: var(--term-ts); font-style: italic; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">OTA <span>Mertani</span> — Modbus Terminal</h1>
+    <div class="header-actions">
+        <div class="conn-status"><span class="status-dot" id="statusDot"></span><span id="statusText">Menghubungkan...</span></div>
+        <form method="post" action="/api/auth/logout"><button type="submit" class="btn">Logout</button></form>
+    </div>
+</header>
+
+<div class="main">
+
+    <!-- ── Kirim Perintah ── -->
+    <div class="panel">
+        <div class="panel-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Kirim Perintah Modbus
+        </div>
+        <div class="panel-body">
+
+        <!-- Mode selector -->
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tabInternet" onclick="switchMode('internet')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                Via Internet (Device Polling)
+            </button>
+            <button class="mode-tab" id="tabSerial" onclick="switchMode('serial')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 11h.01M10 11h.01M14 11h.01M18 11h.01"/></svg>
+                Direct Serial Port (USB/COM)
+            </button>
+        </div>
+
+        <!-- Mode: Internet -->
+        <div class="mode-panel active" id="modeInternet">
+
+            <!-- Builder -->
+            <div class="builder-row">
+                <div class="field">
+                    <label>Slave Addr (hex)</label>
+                    <input id="bAddr" type="text" value="32" placeholder="32">
+                </div>
+                <div class="field">
+                    <label>Function Code</label>
+                    <select id="bFunc">
+                        <option value="03">03 — Read Holding Registers</option>
+                        <option value="06" selected>06 — Write Single Register</option>
+                        <option value="01">01 — Read Coils</option>
+                        <option value="02">02 — Read Discrete Inputs</option>
+                        <option value="04">04 — Read Input Registers</option>
+                        <option value="05">05 — Write Single Coil</option>
+                        <option value="10">10 — Write Multiple Regs</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Register (hex, 2 byte)</label>
+                    <input id="bReg" type="text" placeholder="0F 52">
+                </div>
+                <div class="field">
+                    <label>Value / Count (hex)</label>
+                    <input id="bVal" type="text" placeholder="00 03">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                    <button class="btn" onclick="buildFrame()">▶ Build Frame</button>
+                    <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="includeCrc" checked onchange="buildFrame()"
+                               style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
+                        Tambahkan CRC16 otomatis
+                    </label>
+                    <span id="crcHint" style="font-size:11px;color:var(--text-muted);font-family:Consolas,monospace;"></span>
+                </div>
+                <div class="frame-preview" id="builtFrame" style="flex:1; min-width:200px;">
+                    <span style="color:#30363d;">Frame akan muncul di sini...</span>
+                </div>
+            </div>
+
+            <!-- Target + Send -->
+            <div class="send-grid">
+                <div class="field">
+                    <label>Target Device (Device ID)</label>
+                    <input id="sendDevid" type="text" placeholder="MTI-TESTTETSTETS" spellcheck="false">
+                </div>
+                <div class="field">
+                    <label>Frame Hex (isi manual atau dari Builder)</label>
+                    <input id="sendFrame" type="text" placeholder="32 06 0F 52 00 03 6E CD" spellcheck="false">
+                </div>
+                <div class="field">
+                    <label>Deskripsi (opsional)</label>
+                    <input id="sendDesc" type="text" placeholder="Set register sensor...">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button class="btn btn-primary" onclick="sendCommand()">Kirim ke Antrian</button>
+                <span id="sendStatus" style="font-size:12px; color:var(--text-muted);"></span>
+            </div>
+        </div>
+
+        <!-- Mode: Direct Serial -->
+        <div class="mode-panel" id="modeSerial">
+
+            <!-- Connection bar -->
+            <div class="port-bar">
+                <div class="field">
+                    <label>Port</label>
+                    <select id="portPath" style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;"></select>
+                </div>
+                <div class="field" style="max-width:120px;">
+                    <label>Baud Rate</label>
+                    <select id="portBaud" style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;">
+                        <option>9600</option><option>19200</option><option>38400</option>
+                        <option selected>115200</option><option>230400</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" id="btnConnect" onclick="togglePort()">Hubungkan</button>
+                <button class="btn" onclick="refreshPorts()">↻ Refresh Port</button>
+                <div class="port-status disconnected" id="portStatus">
+                    <span class="status-dot" id="portDot"></span>
+                    <span id="portStatusText">Tidak terhubung</span>
+                </div>
+            </div>
+
+            <!-- Direct send -->
+            <div class="direct-row">
+                <div class="field">
+                    <label>Frame Hex (dari Builder di atas)</label>
+                    <input id="directFrame" type="text" placeholder="32 06 0F 52 00 03" spellcheck="false"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;font-family:Consolas,monospace;"
+                           oninput="previewDirectCrc()">
+                </div>
+                <div class="field" style="max-width:120px;">
+                    <label>Timeout (ms)</label>
+                    <input id="directTimeout" type="number" value="1000" min="100" max="10000"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;">
+                </div>
+                <button class="btn btn-primary" onclick="directSend()" style="align-self:flex-end;">Kirim</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none;">
+                    <input type="checkbox" id="directIncludeCrc" checked onchange="previewDirectCrc()"
+                           style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
+                    Tambahkan CRC16 otomatis
+                </label>
+                <span id="directCrcHint" style="font-size:11px;color:var(--text-muted);font-family:Consolas,monospace;"></span>
+            </div>
+
+            <!-- Raw terminal -->
+            <div id="rawTerm"><span class="raw-sys">── Terminal serial siap ──</span></div>
+            <div style="display:flex;justify-content:flex-end;">
+                <button class="btn btn-sm" onclick="clearRaw()">Hapus</button>
+            </div>
+        </div>
+
+        </div>
+    </div>
+
+    <!-- ── History ── -->
+    <div id="sectionHistory" class="panel">
+        <div class="panel-head" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Riwayat Perintah
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <select id="histDevid" style="padding:5px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;" onchange="loadHistory()">
+                    <option value="">Semua Device</option>
+                </select>
+                <button class="btn btn-sm" onclick="loadHistory()">↻ Refresh</button>
+            </div>
+        </div>
+        <div class="panel-body" style="padding:0;">
+            <div class="history-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Device</th><th>Frame TX</th><th>Deskripsi</th>
+                            <th>Status</th><th>Frame RX</th><th>Waktu</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr class="empty-row"><td colspan="8">Belum ada perintah.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Live Monitor ── -->
+    <div id="sectionMonitor" class="terminal-wrap">
+        <div class="terminal-header">
+            <span class="terminal-title">LIVE MODBUS MONITOR</span>
+            <div class="terminal-controls">
+                <select id="filterDevid"><option value="">Semua Device</option></select>
+                <select id="filterMode">
+                    <option value="all">TX + RX</option>
+                    <option value="tx">TX saja</option>
+                    <option value="rx">RX saja</option>
+                </select>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#ea580c"></div>TX</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#e6edf3"></div>RX</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#d2a8ff"></div>Addr</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#ffa657"></div>Func</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#79c0ff"></div>Reg</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#56d364"></div>Val</div>
+                </div>
+                <button onclick="clearTerminal()">Hapus</button>
+                <button id="scrollBtn" onclick="toggleAutoScroll()">▼ Auto</button>
+            </div>
+        </div>
+        <div id="terminal"><div class="t-empty">Menunggu frame Modbus dari device...</div></div>
+    </div>
+
+    <!-- ── Inspector ── -->
+    <div id="sectionInspector" class="panels-2">
+        <div class="panel">
+            <div class="panel-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                Frame Inspector
+            </div>
+            <div class="panel-body">
+                <div class="field">
+                    <label>Frame Hex</label>
+                    <input id="inspectInput" type="text" placeholder="32 06 0F 52 00 03 6E CD" spellcheck="false">
+                </div>
+                <button class="btn btn-primary" onclick="inspectFrame()">Inspect</button>
+                <div class="crc-result" id="inspectResult" style="display:none;"></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Panduan Endpoint Firmware
+            </div>
+            <div class="panel-body" style="font-size:12px; gap:8px;">
+                <p style="margin:0; color:var(--text-muted); font-weight:600;">Firmware perlu implement 2 endpoint:</p>
+                <div style="background:var(--term-bg);border-radius:7px;padding:12px;font-family:Consolas,monospace;font-size:11.5px;color:#e6edf3;white-space:pre-wrap;">GET /api/device/modbus/poll?devid=&lt;DEVID&gt;
+
+Response jika ada perintah:
+{
+  "command_id": 42,
+  "frame": "32 06 0F 52 00 03 6E CD"
+}
+
+Response jika tidak ada:
+{ "command_id": null }</div>
+                <div style="background:var(--term-bg);border-radius:7px;padding:12px;font-family:Consolas,monospace;font-size:11.5px;color:#e6edf3;white-space:pre-wrap;">POST /api/device/modbus/response
+Content-Type: application/json
+
+{
+  "devid": "&lt;DEVID&gt;",
+  "command_id": 42,
+  "frame": "32 06 0F 52 00 03 6E CD",
+  "status": "ok"
+}
+
+status: "ok" | "error" | "timeout"</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Konverter Hex ── -->
+    <div class="panel">
+        <div class="panel-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            Konverter Hex → Desimal / IEEE 754
+        </div>
+        <div class="panel-body">
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+                <div class="field" style="flex:1;min-width:200px;">
+                    <label>Input Hex (2 atau 4 byte)</label>
+                    <input id="convInput" type="text" placeholder="41 20 00 00" spellcheck="false"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;font-family:Consolas,monospace;"
+                           oninput="convertHex()">
+                </div>
+                <button class="btn btn-primary" onclick="convertHex()">Konversi</button>
+                <button class="btn" onclick="pasteFromInspect()">↑ Ambil dari Inspector</button>
+            </div>
+            <div id="convResult" style="display:none;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:2px solid var(--border-color);white-space:nowrap;">Format</th>
+                            <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:2px solid var(--border-color);">Byte Order</th>
+                            <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:2px solid var(--border-color);">Hex (reordered)</th>
+                            <th style="padding:8px 12px;text-align:left;font-weight:600;color:var(--text-muted);border-bottom:2px solid var(--border-color);">Nilai</th>
+                        </tr>
+                    </thead>
+                    <tbody id="convBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<nav class="mac-dock" aria-label="Navigasi utama">
+    <a class="dock-item" href="/" aria-label="Dashboard OTA">
+        <span class="dock-label">Dashboard OTA</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/>
+            <rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>
+        </svg>
+    </a>
+    <a class="dock-item" href="/monitor" aria-label="Serial Monitor">
+        <span class="dock-label">Serial Monitor</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15H17"/>
+        </svg>
+    </a>
+    <a class="dock-item active" href="/modbus" aria-current="page" aria-label="Modbus Terminal">
+        <span class="dock-label">Modbus Terminal</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
+        </svg>
+    </a>
+</nav>
+
+<script>
+// ── CRC16 Modbus ──────────────────────────────────────────
+function crc16(bytes) {
+    let crc = 0xFFFF;
+    for (const b of bytes) {
+        crc ^= b;
+        for (let i = 0; i < 8; i++) crc = (crc & 1) ? (crc >>> 1) ^ 0xA001 : crc >>> 1;
+    }
+    return crc;
+}
+function hexToBytes(str) {
+    return str.trim().split(/\s+/).filter(s => /^[0-9a-fA-F]{1,2}$/.test(s)).map(s => parseInt(s, 16));
+}
+function byteToHex(b) { return b.toString(16).toUpperCase().padStart(2, '0'); }
+
+const FUNC_NAMES = {
+    '01':'Read Coils','02':'Read DI','03':'Read HR','04':'Read IR',
+    '05':'Write Coil','06':'Write Reg','10':'Write Regs','0F':'Write Coils'
+};
+
+function parseFrame(bytes) {
+    if (bytes.length < 4) return null;
+    const func = bytes[1], funcHex = byteToHex(func);
+    const data = bytes.slice(2, bytes.length - 2);
+    const crcGiven = bytes[bytes.length - 2] | (bytes[bytes.length - 1] << 8);
+    const crcCalc = crc16(bytes.slice(0, bytes.length - 2));
+    let desc = '';
+    if (func === 0x06 && data.length >= 4)
+        desc = `reg=0x${byteToHex(data[0])}${byteToHex(data[1])} val=${(data[2]<<8)|data[3]}`;
+    else if ((func === 0x03 || func === 0x04) && data.length >= 4)
+        desc = `reg=0x${byteToHex(data[0])}${byteToHex(data[1])} n=${(data[2]<<8)|data[3]}`;
+    return { addr: bytes[0], funcHex, data, crcGiven, crcCalc, crcOk: crcGiven === crcCalc, desc, name: FUNC_NAMES[funcHex] || `Func 0x${funcHex}` };
+}
+
+function colorBytes(bytes) {
+    if (bytes.length < 4) return bytes.map(b => `<span class="t-byte b-raw">${byteToHex(b)}</span>`).join('');
+    const data = bytes.slice(2, bytes.length - 2);
+    const parts = [
+        `<span class="t-byte b-addr">${byteToHex(bytes[0])}</span>`,
+        `<span class="t-byte b-func">${byteToHex(bytes[1])}</span>`,
+    ];
+    if (data.length >= 2) parts.push(`<span class="t-byte b-reg">${byteToHex(data[0])}</span>`, `<span class="t-byte b-reg">${byteToHex(data[1])}</span>`);
+    for (let i = 2; i < data.length; i++) parts.push(`<span class="t-byte b-val">${byteToHex(data[i])}</span>`);
+    parts.push(`<span class="t-byte b-crc">${byteToHex(bytes[bytes.length-2])}</span>`);
+    parts.push(`<span class="t-byte b-crc">${byteToHex(bytes[bytes.length-1])}</span>`);
+    return parts.join('');
+}
+
+// ── Frame Builder ─────────────────────────────────────────
+function buildFrame() {
+    const addr = parseInt(document.getElementById('bAddr').value.trim().replace(/^0x/i,''), 16);
+    const func = parseInt(document.getElementById('bFunc').value, 16);
+    const regHex = document.getElementById('bReg').value.trim().replace(/\s+/g,'');
+    const valHex = document.getElementById('bVal').value.trim().replace(/\s+/g,'');
+    if (isNaN(addr) || isNaN(func)) return;
+    const regBytes = regHex.match(/.{1,2}/g)?.map(h=>parseInt(h,16)) || [];
+    const valBytes = valHex.match(/.{1,2}/g)?.map(h=>parseInt(h,16)) || [];
+    const payload = [addr, func, ...regBytes, ...valBytes];
+
+    const withCrc = document.getElementById('includeCrc').checked;
+    const crc = crc16(payload);
+    const crcLo = crc & 0xFF, crcHi = (crc >> 8) & 0xFF;
+    const full = withCrc ? [...payload, crcLo, crcHi] : payload;
+    const hex = full.map(byteToHex).join(' ');
+
+    const hint = document.getElementById('crcHint');
+    hint.textContent = withCrc
+        ? `CRC: ${byteToHex(crcLo)} ${byteToHex(crcHi)}`
+        : `CRC (tidak disertakan): ${byteToHex(crcLo)} ${byteToHex(crcHi)}`;
+
+    document.getElementById('builtFrame').innerHTML =
+        `${colorBytes(full)}<span style="color:#8b949e;font-size:11px;display:block;margin-top:4px;width:100%;">${hex}</span>`;
+    document.getElementById('sendFrame').value = hex;
+    document.getElementById('inspectInput').value = hex;
+}
+
+// ── Send command ──────────────────────────────────────────
+async function sendCommand() {
+    const devid = document.getElementById('sendDevid').value;
+    const frame = document.getElementById('sendFrame').value.trim();
+    const description = document.getElementById('sendDesc').value.trim();
+    const status = document.getElementById('sendStatus');
+
+    if (!devid) { status.style.color='#dc2626'; status.textContent = 'Masukkan Device ID terlebih dahulu.'; return; }
+    if (!frame) { status.style.color='#dc2626'; status.textContent = 'Frame tidak boleh kosong.'; return; }
+
+    status.style.color='#64748b'; status.textContent = 'Mengirim...';
+    try {
+        const res = await fetch('/api/admin/modbus/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ devid, frame, description })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            status.style.color='#16a34a'; status.textContent = `✓ Perintah #${data.data.id} dikirim ke antrian.`;
+            loadHistory();
+        } else {
+            status.style.color='#dc2626'; status.textContent = data.error || 'Gagal.';
+        }
+    } catch { status.style.color='#dc2626'; status.textContent = 'Koneksi gagal.'; }
+}
+
+// ── History ───────────────────────────────────────────────
+const STATUS_BADGE = {
+    pending: 'badge-pending', sent: 'badge-sent', done: 'badge-done',
+    timeout: 'badge-timeout', error: 'badge-error', cancelled: 'badge-cancelled'
+};
+function fmtTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+async function loadHistory() {
+    const devid = document.getElementById('histDevid').value;
+    const url = '/api/admin/modbus/history' + (devid ? `?devid=${encodeURIComponent(devid)}` : '');
+    try {
+        const res = await fetch(url);
+        const { data } = await res.json();
+        const tbody = document.getElementById('historyBody');
+        if (!data.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Belum ada perintah.</td></tr>'; return; }
+        tbody.innerHTML = data.map(r => `
+            <tr>
+                <td style="color:var(--text-muted);">${r.id}</td>
+                <td style="color:#7c3aed;">${r.devid}</td>
+                <td>${colorBytesInline(r.frame)}</td>
+                <td style="font-family:inherit;color:var(--text-muted);">${r.description || '—'}</td>
+                <td><span class="badge ${STATUS_BADGE[r.status] || ''}">${r.status}</span></td>
+                <td>${r.response_frame
+                    ? `${colorBytesInline(r.response_frame)} <span class="${r.response_status==='ok'?'resp-ok':'resp-err'}">${r.response_status}</span>`
+                    : '—'}</td>
+                <td style="color:var(--text-muted);white-space:nowrap;">${fmtTime(r.created_at)}</td>
+                <td>${r.status==='pending'?`<button class="btn btn-sm btn-danger" onclick="cancelCmd(${r.id})">Batal</button>`:''}
+                </td>
+            </tr>
+        `).join('');
+    } catch {}
+}
+
+function colorBytesInline(hex) {
+    const bytes = hexToBytes(hex);
+    return colorBytes(bytes);
+}
+
+async function cancelCmd(id) {
+    await fetch(`/api/admin/modbus/command/${id}`, { method: 'DELETE' });
+    loadHistory();
+}
+
+// ── SSE Live Monitor ──────────────────────────────────────
+const dot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const term = document.getElementById('terminal');
+let autoScroll = true;
+let rowCount = 0;
+const devices = new Set();
+const TX_RE = /Send:\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})+)/;
+const RX_RE = /Receive:\s+([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})+)/;
+const TS_RE = /\[(\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2})\]/;
+
+function registerDevice(devid) {
+    if (devices.has(devid)) return;
+    devices.add(devid);
+    ['filterDevid','histDevid'].forEach(id => {
+        const sel = document.getElementById(id);
+        const opt = document.createElement('option');
+        opt.value = devid; opt.textContent = devid;
+        sel.appendChild(opt);
+    });
+}
+
+function addRow(ts, devid, dir, hexStr) {
+    const mode = document.getElementById('filterMode').value;
+    if (mode === 'tx' && dir !== 'TX') return;
+    if (mode === 'rx' && dir !== 'RX') return;
+    const fd = document.getElementById('filterDevid').value;
+    if (fd && devid !== fd) return;
+    const emptyEl = term.querySelector('.t-empty');
+    if (emptyEl) emptyEl.remove();
+    const bytes = hexToBytes(hexStr);
+    const parsed = parseFrame(bytes);
+    const row = document.createElement('div');
+    row.className = 't-row';
+    row.innerHTML = `
+        <span class="t-ts">${ts}</span>
+        <span class="t-devid">${devid}</span>
+        <span class="t-dir ${dir==='TX'?'tx':'rx'}">${dir}</span>
+        <span class="t-frames">${colorBytes(bytes)}${parsed ? `<span class="t-parsed">${parsed.name}${parsed.desc?' · '+parsed.desc:''}${parsed.crcOk?' ✓':' ✗CRC'}</span>` : ''}</span>
+    `;
+    term.appendChild(row);
+    rowCount++;
+    if (rowCount > 500) { const rows = term.querySelectorAll('.t-row'); if (rows.length > 500) rows[0].remove(); }
+    if (autoScroll) term.scrollTop = term.scrollHeight;
+}
+
+let es;
+function connect() {
+    es = new EventSource('/api/admin/serial/stream');
+    es.addEventListener('connected', () => { dot.classList.add('live'); statusText.textContent = 'Live'; });
+    es.addEventListener('log', e => {
+        try {
+            const { devid = '?', message = '' } = JSON.parse(e.data);
+            registerDevice(devid);
+            const tsM = TS_RE.exec(message);
+            const ts = tsM ? tsM[1].slice(9) : new Date().toLocaleTimeString('id-ID');
+            const txM = TX_RE.exec(message), rxM = RX_RE.exec(message);
+            if (txM) addRow(ts, devid, 'TX', txM[1]);
+            else if (rxM) addRow(ts, devid, 'RX', rxM[1]);
+        } catch (_) {}
+    });
+    es.onerror = () => { dot.classList.remove('live'); statusText.textContent = 'Terputus...'; es.close(); setTimeout(connect, 3000); };
+}
+connect();
+
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('scrollBtn');
+    btn.textContent = autoScroll ? '▼ Auto' : '⏸ Auto';
+    btn.style.opacity = autoScroll ? '1' : '0.5';
+    if (autoScroll) term.scrollTop = term.scrollHeight;
+}
+function clearTerminal() { term.innerHTML = '<div class="t-empty">Terminal dikosongkan.</div>'; rowCount = 0; }
+
+// ── Inspector ─────────────────────────────────────────────
+function inspectFrame() {
+    const bytes = hexToBytes(document.getElementById('inspectInput').value);
+    const result = document.getElementById('inspectResult');
+    result.style.display = 'block';
+    if (bytes.length < 4) { result.innerHTML = '<span style="color:#f85149;">Frame terlalu pendek (min 4 byte)</span>'; return; }
+    const p = parseFrame(bytes);
+    const crcBytes = `${byteToHex(bytes[bytes.length-2])} ${byteToHex(bytes[bytes.length-1])}`;
+    const crcExp = `${byteToHex(p.crcCalc&0xFF)} ${byteToHex((p.crcCalc>>8)&0xFF)}`;
+    result.innerHTML =
+        `<span style="color:#8b949e;">Slave Addr : </span><span style="color:#d2a8ff;">0x${byteToHex(p.addr)} (${p.addr})</span>\n` +
+        `<span style="color:#8b949e;">Function   : </span><span style="color:#ffa657;">0x${p.funcHex} — ${p.name}</span>\n` +
+        `<span style="color:#8b949e;">Data       : </span><span style="color:#79c0ff;">${p.data.map(byteToHex).join(' ')||'—'}</span>\n` +
+        `<span style="color:#8b949e;">CRC given  : </span>${crcBytes} → ${p.crcOk?'<span style="color:#3fb950;font-weight:700;">✓ VALID</span>':'<span style="color:#f85149;font-weight:700;">✗ INVALID — expected '+crcExp+'</span>'}\n` +
+        (p.desc ? `<span style="color:#8b949e;">Parsed     : </span><span style="color:#56d364;">${p.desc}</span>` : '');
+}
+
+// ── Konverter Hex ─────────────────────────────────────────
+function pasteFromInspect() {
+    const val = document.getElementById('inspectInput').value.trim();
+    if (val) { document.getElementById('convInput').value = val; convertHex(); }
+}
+
+function ieee754(b0, b1, b2, b3) {
+    const buf = new ArrayBuffer(4);
+    const view = new DataView(buf);
+    view.setUint8(0, b0); view.setUint8(1, b1);
+    view.setUint8(2, b2); view.setUint8(3, b3);
+    const f = view.getFloat32(0, false); // big-endian read
+    return isFinite(f) ? f : null;
+}
+
+function fmtFloat(v) {
+    if (v === null) return '<span style="color:#f85149;">NaN / Inf</span>';
+    // show up to 6 significant digits, strip trailing zeros
+    return `<strong>${parseFloat(v.toPrecision(7))}</strong>`;
+}
+
+function convertHex() {
+    const raw = document.getElementById('convInput').value.trim();
+    const bytes = hexToBytes(raw);
+    const result = document.getElementById('convResult');
+    const tbody = document.getElementById('convBody');
+
+    if (!bytes.length) { result.style.display = 'none'; return; }
+    result.style.display = 'block';
+
+    const rows = [];
+    const hex = b => byteToHex(b);
+
+    if (bytes.length >= 2) {
+        const [A, B] = bytes;
+        // Unsigned int 16
+        rows.push({ fmt:'UInt16', order:'AB (Big Endian)', reorder:`${hex(A)} ${hex(B)}`,
+            val: `<strong>${(A<<8|B)}</strong>` });
+        rows.push({ fmt:'UInt16', order:'BA (Little Endian)', reorder:`${hex(B)} ${hex(A)}`,
+            val: `<strong>${(B<<8|A)}</strong>` });
+        // Signed int 16
+        const s_be = (A<<8|B) > 0x7FFF ? (A<<8|B) - 0x10000 : (A<<8|B);
+        const s_le = (B<<8|A) > 0x7FFF ? (B<<8|A) - 0x10000 : (B<<8|A);
+        rows.push({ fmt:'Int16', order:'AB (Big Endian)', reorder:`${hex(A)} ${hex(B)}`,
+            val: `<strong>${s_be}</strong>` });
+        rows.push({ fmt:'Int16', order:'BA (Little Endian)', reorder:`${hex(B)} ${hex(A)}`,
+            val: `<strong>${s_le}</strong>` });
+    }
+
+    if (bytes.length >= 4) {
+        const [A, B, C, D] = bytes;
+        // UInt32 & Int32
+        const uint_be = ((A<<24)|(B<<16)|(C<<8)|D) >>> 0;
+        const uint_le = ((D<<24)|(C<<16)|(B<<8)|A) >>> 0;
+        rows.push({ fmt:'UInt32', order:'ABCD (Big Endian)', reorder:`${hex(A)} ${hex(B)} ${hex(C)} ${hex(D)}`,
+            val:`<strong>${uint_be}</strong>` });
+        rows.push({ fmt:'UInt32', order:'DCBA (Little Endian)', reorder:`${hex(D)} ${hex(C)} ${hex(B)} ${hex(A)}`,
+            val:`<strong>${uint_le}</strong>` });
+
+        const int_be = uint_be > 0x7FFFFFFF ? uint_be - 0x100000000 : uint_be;
+        const int_le = uint_le > 0x7FFFFFFF ? uint_le - 0x100000000 : uint_le;
+        rows.push({ fmt:'Int32', order:'ABCD (Big Endian)', reorder:`${hex(A)} ${hex(B)} ${hex(C)} ${hex(D)}`,
+            val:`<strong>${int_be}</strong>` });
+        rows.push({ fmt:'Int32', order:'DCBA (Little Endian)', reorder:`${hex(D)} ${hex(C)} ${hex(B)} ${hex(A)}`,
+            val:`<strong>${int_le}</strong>` });
+
+        // IEEE 754 Float 32 — 4 byte orders
+        const f_abcd = ieee754(A,B,C,D);
+        const f_dcba = ieee754(D,C,B,A);
+        const f_cdab = ieee754(C,D,A,B);
+        const f_badc = ieee754(B,A,D,C);
+
+        rows.push({ fmt:'Float32', order:'ABCD (Big Endian)', reorder:`${hex(A)} ${hex(B)} ${hex(C)} ${hex(D)}`,
+            val: fmtFloat(f_abcd) });
+        rows.push({ fmt:'Float32', order:'DCBA (Little Endian)', reorder:`${hex(D)} ${hex(C)} ${hex(B)} ${hex(A)}`,
+            val: fmtFloat(f_dcba) });
+        rows.push({ fmt:'Float32', order:'CDAB (Mid-Big / Modbus)', reorder:`${hex(C)} ${hex(D)} ${hex(A)} ${hex(B)}`,
+            val: fmtFloat(f_cdab) });
+        rows.push({ fmt:'Float32', order:'BADC (Mid-Little)', reorder:`${hex(B)} ${hex(A)} ${hex(D)} ${hex(C)}`,
+            val: fmtFloat(f_badc) });
+    }
+
+    // Group by format with alternating bg
+    const fmtColor = { UInt16:'#f0fdf4', Int16:'#f0f9ff', UInt32:'#fefce8', Int32:'#faf5ff', Float32:'#fff7ed' };
+    tbody.innerHTML = rows.map(r => `
+        <tr>
+            <td style="padding:7px 12px;border-bottom:1px solid var(--border-color);background:${fmtColor[r.fmt]||'#fff'};font-weight:600;white-space:nowrap;">${r.fmt}</td>
+            <td style="padding:7px 12px;border-bottom:1px solid var(--border-color);color:var(--text-muted);white-space:nowrap;">${r.order}</td>
+            <td style="padding:7px 12px;border-bottom:1px solid var(--border-color);font-family:Consolas,monospace;">${r.reorder}</td>
+            <td style="padding:7px 12px;border-bottom:1px solid var(--border-color);font-family:Consolas,monospace;">${r.val}</td>
+        </tr>
+    `).join('');
+}
+
+// ── Auto-refresh history setiap 3 detik ──────────────────
+loadHistory();
+setInterval(loadHistory, 3000);
+
+// ── Mode tabs ─────────────────────────────────────────────
+function switchMode(mode) {
+    document.getElementById('modeInternet').classList.toggle('active', mode === 'internet');
+    document.getElementById('modeSerial').classList.toggle('active', mode === 'serial');
+    document.getElementById('tabInternet').classList.toggle('active', mode === 'internet');
+    document.getElementById('tabSerial').classList.toggle('active', mode === 'serial');
+
+    const internetOnly = ['sectionHistory', 'sectionMonitor', 'sectionInspector'];
+    internetOnly.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = mode === 'internet' ? '' : 'none';
+    });
+
+    if (mode === 'serial') { refreshPorts(); checkPortStatus(); }
+}
+
+// ── Serial Port ───────────────────────────────────────────
+let portConnected = false;
+let serialEs = null;
+
+async function refreshPorts() {
+    try {
+        const res = await fetch('/api/admin/serialport/ports');
+        const { ports } = await res.json();
+        const sel = document.getElementById('portPath');
+        const cur = sel.value;
+        sel.innerHTML = ports.length
+            ? ports.map(p => `<option value="${p.path}"${p.path===cur?' selected':''}>${p.path}${p.manufacturer?' — '+p.manufacturer:''}</option>`).join('')
+            : '<option value="">— tidak ada port —</option>';
+    } catch {}
+}
+
+async function checkPortStatus() {
+    try {
+        const res = await fetch('/api/admin/serialport/status');
+        const { connected, info } = await res.json();
+        setPortStatus(connected, info);
+    } catch {}
+}
+
+function setPortStatus(connected, info) {
+    portConnected = connected;
+    const dot = document.getElementById('portDot');
+    const statusEl = document.getElementById('portStatus');
+    const textEl = document.getElementById('portStatusText');
+    const btn = document.getElementById('btnConnect');
+    if (connected) {
+        dot.classList.add('live');
+        statusEl.className = 'port-status connected';
+        textEl.textContent = `${info.path} @ ${info.baudRate}`;
+        btn.textContent = 'Putuskan';
+        if (!serialEs) subscribeSerial();
+    } else {
+        dot.classList.remove('live');
+        statusEl.className = 'port-status disconnected';
+        textEl.textContent = 'Tidak terhubung';
+        btn.textContent = 'Hubungkan';
+        if (serialEs) { serialEs.close(); serialEs = null; }
+    }
+}
+
+async function togglePort() {
+    if (portConnected) {
+        await fetch('/api/admin/serialport/close', { method: 'POST' });
+        setPortStatus(false, null);
+        rawLog('Port ditutup.', 'sys');
+    } else {
+        const path = document.getElementById('portPath').value;
+        const baudRate = document.getElementById('portBaud').value;
+        if (!path) { rawLog('Pilih port terlebih dahulu.', 'err'); return; }
+        try {
+            const res = await fetch('/api/admin/serialport/open', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ path, baudRate })
+            });
+            const data = await res.json();
+            if (res.ok) { setPortStatus(true, data.info); rawLog(`Terhubung ke ${path} @ ${baudRate}`, 'sys'); }
+            else { rawLog(`Gagal: ${data.error}`, 'err'); }
+        } catch (e) { rawLog('Koneksi gagal.', 'err'); }
+    }
+}
+
+function previewDirectCrc() {
+    const raw = document.getElementById('directFrame').value.trim();
+    const bytes = hexToBytes(raw);
+    const hint = document.getElementById('directCrcHint');
+    if (!bytes.length) { hint.textContent = ''; return; }
+    const withCrc = document.getElementById('directIncludeCrc').checked;
+    const crc = crc16(bytes);
+    const lo = byteToHex(crc & 0xFF), hi = byteToHex((crc >> 8) & 0xFF);
+    hint.textContent = withCrc
+        ? `CRC: ${lo} ${hi} → akan dikirim: ${raw} ${lo} ${hi}`
+        : `CRC (tidak disertakan): ${lo} ${hi}`;
+}
+
+async function directSend() {
+    const rawFrame = document.getElementById('directFrame').value.trim();
+    const withCrc = document.getElementById('directIncludeCrc').checked;
+    const timeoutMs = document.getElementById('directTimeout').value;
+    if (!rawFrame) { rawLog('Frame kosong.', 'err'); return; }
+    if (!portConnected) { rawLog('Port belum terhubung.', 'err'); return; }
+
+    let frame = rawFrame;
+    if (withCrc) {
+        const bytes = hexToBytes(rawFrame);
+        const crc = crc16(bytes);
+        frame = `${rawFrame} ${byteToHex(crc & 0xFF)} ${byteToHex((crc >> 8) & 0xFF)}`;
+    }
+
+    rawLog(`TX → ${frame}`, 'tx');
+    try {
+        const res = await fetch('/api/admin/serialport/send', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ frame, timeoutMs })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            rawLog(`RX ← ${data.rx}`, 'rx');
+            document.getElementById('inspectInput').value = data.rx;
+            inspectFrame();
+        } else if (res.status === 408) {
+            rawLog(`TIMEOUT${data.received ? ' (parsial: '+data.received+')' : ''}`, 'err');
+        } else {
+            rawLog(`Error: ${data.error}`, 'err');
+        }
+    } catch { rawLog('Gagal mengirim.', 'err'); }
+}
+
+function subscribeSerial() {
+    serialEs = new EventSource('/api/admin/serialport/stream');
+    serialEs.addEventListener('data', e => {
+        const { hex } = JSON.parse(e.data);
+        // Only show if not triggered by directSend (avoid duplicate)
+    });
+    serialEs.addEventListener('port_closed', () => setPortStatus(false, null));
+    serialEs.onerror = () => { serialEs?.close(); serialEs = null; };
+}
+
+function rawLog(msg, type = 'sys') {
+    const el = document.createElement('div');
+    el.className = `raw-${type}`;
+    const ts = new Date().toLocaleTimeString('id-ID');
+    el.textContent = `[${ts}] ${msg}`;
+    const term = document.getElementById('rawTerm');
+    term.appendChild(el);
+    term.scrollTop = term.scrollHeight;
+}
+function clearRaw() { document.getElementById('rawTerm').innerHTML = '<span class="raw-sys">── Terminal dikosongkan ──</span>'; }
+
+// Sync builder frame ke direct frame juga
+const origBuildFrame = buildFrame;
+buildFrame = function() {
+    origBuildFrame();
+    const hex = document.getElementById('sendFrame').value;
+    document.getElementById('directFrame').value = hex;
+};
+</script>
+</body>
+</html>
