@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OTA Mertani</title>
+    <link rel="stylesheet" href="/navigation.css">
     <style>
         :root {
             --primary: #ea580c;
@@ -143,7 +144,26 @@
         .error   { background-color: #fef2f2; color: #991b1b; border: 1px solid #fee2e2; }
         .info    { background-color: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
 
-        .firmware-list { margin-top: 20px; }
+        .firmware-list {
+            margin-top: 20px;
+            max-height: min(52vh, 480px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable;
+            padding-right: 8px;
+        }
+
+        .firmware-list::-webkit-scrollbar { width: 8px; }
+        .firmware-list::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 999px;
+        }
+        .firmware-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 999px;
+        }
+        .firmware-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
         .firmware-item {
             background: #ffffff;
@@ -203,6 +223,12 @@
             margin-bottom: 20px;
         }
         .info-box strong { display: block; margin-bottom: 4px; }
+
+        @media (max-width: 640px) {
+            .firmware-list { max-height: 55vh; }
+            .firmware-item { flex-direction: column; }
+            .btn-delete { align-self: flex-end; }
+        }
     </style>
 </head>
 <body>
@@ -282,6 +308,25 @@
         </div>
     </div>
 </div>
+
+<nav class="mac-dock" aria-label="Navigasi utama">
+    <a class="dock-item active" href="/" aria-current="page" aria-label="Dashboard OTA">
+        <span class="dock-label">Dashboard OTA</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="2"/>
+            <rect x="14" y="3" width="7" height="7" rx="2"/>
+            <rect x="3" y="14" width="7" height="7" rx="2"/>
+            <rect x="14" y="14" width="7" height="7" rx="2"/>
+        </svg>
+    </a>
+    <a class="dock-item" href="/monitor" aria-label="Serial Monitor">
+        <span class="dock-label">Serial Monitor</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3"/>
+            <path d="m7 9 3 3-3 3M12.5 15H17"/>
+        </svg>
+    </a>
+</nav>
 
 <script>
     function fillVersion(ver) {

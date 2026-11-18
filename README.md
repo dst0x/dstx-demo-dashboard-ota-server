@@ -22,6 +22,7 @@ Firmware management backend for IoT microcontrollers. Handles binary uploads, SH
 - SHA-256 Checksum Generator: Otomatis menghasilkan kode hash kriptografi untuk validasi integritas firmware di mikrokontroler.
 - Database PostgreSQL: Menyimpan metadata rilis firmware (version, hardware_target, checksum, file_size, release_notes) dan pelacakan perangkat.
 - OTA Polling & Download Endpoint: Endpoint khusus bagi perangkat IoT untuk mengecek pembaruan dan mengunduh file biner.
+- Live Serial Monitor: Menampilkan log dari masing-masing device secara langsung, lengkap dengan filter device, level, pencarian, jeda, dan pembersihan buffer.
 
 ---
 
@@ -41,15 +42,20 @@ dstx-demo-dashboard-ota-server/
 ├── src/
 │   ├── controllers/
 │   │   ├── admin_controller.js
-│   │   └── ota_controller.js
+│   │   ├── ota_controller.js
+│   │   └── serial_controller.js
 │   ├── database/
 │   │   ├── db.js
 │   │   └── init.js
 │   ├── middlewares/
+│   │   ├── serial_token.js
 │   │   └── upload.js
 │   ├── routes/
 │   │   ├── admin_routes.js
-│   │   └── ota_routes.js
+│   │   ├── ota_routes.js
+│   │   └── serial_routes.js
+│   ├── services/
+│   │   └── serial_monitor.js
 │   └── utils/
 │       └── hash_helper.js
 ├── storage/
@@ -110,12 +116,17 @@ npm install --save-dev nodemon
 Create `.env` in the project root:
 
 ```env
-PORT=3000
+PORT=3100
 DB_HOST=localhost
 DB_PORT=5433
 DB_USER=example_admin
 DB_PASSWORD=example_supersecret
 DB_NAME=example_database
+ADMIN_USERNAME=admin_mertani
+ADMIN_PASSWORD=change_this_password
+SESSION_SECRET=generate_a_long_random_value
+SERIAL_INGEST_TOKEN=generate_a_device_token
+SERIAL_LOG_LIMIT=1000
 ```
 
 ### 3. Start PostgreSQL
@@ -136,7 +147,7 @@ node src/database/init.js
 npx nodemon server.js
 ```
 
-Server runs at `http://localhost:3000`.
+Server runs at `http://localhost:3100`.
 
 ---
 
@@ -199,6 +210,36 @@ Nilai `download_status` wajib berupa boolean JSON (`true` atau `false`), bukan s
 - Deskripsi: Mengunduh paket `UPDATE.MTI` terbaru yang ditargetkan ke device tersebut.
 
 Saat upload dari dashboard, kolom **Target Device ID** menerima satu atau beberapa `devid` yang dipisahkan koma. Gunakan target `*` hanya bila firmware memang harus tersedia untuk seluruh device.
+
+### Serial Monitor
+
+Halaman monitor tersedia di `http://localhost:3100/monitor` dan dilindungi oleh login admin.
+
+Device mengirim satu log menggunakan endpoint berikut:
+
+```http
+POST /api/serial/logs
+Content-Type: application/json
+X-Device-Token: <nilai SERIAL_INGEST_TOKEN dari .env>
+```
+
+```json
+{
+  "devid": "MTI-0001",
+  "level": "info",
+  "message": "Boot selesai, sensor siap"
+}
+```
+
+Nilai `level` yang diterima adalah `debug`, `info`, `warn`, dan `error`. Server menyimpan maksimal `SERIAL_LOG_LIMIT` entri di memori. Buffer log akan kosong ketika proses Node.js dimulai ulang.
+
+Untuk memutar file log secara otomatis dan terus-menerus ke halaman Serial Monitor:
+
+```bash
+npm run serial:replay
+```
+
+Sumber file, `devid`, interval pengiriman, dan mode pengulangan dapat diatur melalui `SERIAL_LOG_FILE`, `SERIAL_LOG_DEVID`, `SERIAL_REPLAY_DELAY_MS`, serta `SERIAL_REPLAY_LOOP` di `.env`. Tekan `Ctrl+C` untuk menghentikannya. Nilai yang tampak seperti password, token, atau Bluetooth key disamarkan sebelum dikirim.
 
 ---
 

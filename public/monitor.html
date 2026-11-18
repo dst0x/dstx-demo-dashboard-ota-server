@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serial Monitor · OTA Mertani</title>
+    <link rel="stylesheet" href="/navigation.css">
+    <style>
+        :root {
+            --primary: #ea580c;
+            --primary-hover: #c2410c;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --card-bg: #f8fafc;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            color: var(--text-main);
+            background: #fff;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border-color);
+            background: #fff;
+        }
+        header h1 { display: flex; gap: 10px; margin: 0; font-size: 20px; }
+        header h1 span { color: var(--primary); }
+        .header-actions { display: flex; align-items: center; gap: 16px; }
+        .btn-logout, .btn-secondary, .btn-danger {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            color: var(--text-main);
+            background: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-logout:hover, .btn-secondary:hover { border-color: #fdba74; color: var(--primary-hover); }
+        .btn-danger { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+
+        .main-container { max-width: 1120px; margin: 30px auto; padding: 0 20px; }
+        .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+        .page-heading h2 { margin: 0 0 6px; font-size: 24px; }
+        .page-heading p { margin: 0; color: var(--text-muted); font-size: 13px; }
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 10px;
+            border: 1px solid #bbf7d0;
+            border-radius: 999px;
+            color: #166534;
+            background: #f0fdf4;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .connection-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+        .connection-status.offline { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+        .connection-status.offline::before { background: #ef4444; }
+
+        .card {
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--card-bg);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .toolbar { display: grid; grid-template-columns: 1fr 150px 190px auto auto; gap: 10px; margin-bottom: 14px; }
+        input, select {
+            width: 100%;
+            height: 38px;
+            padding: 0 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            background: #fff;
+            font: inherit;
+            font-size: 13px;
+        }
+        input:focus, select:focus { outline: 2px solid #fed7aa; border-color: #fb923c; }
+
+        .terminal-shell { overflow: hidden; border: 1px solid #1e293b; border-radius: 10px; background: #07101e; }
+        .terminal-titlebar {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            height: 38px;
+            padding: 0 13px;
+            color: #94a3b8;
+            background: #111827;
+            border-bottom: 1px solid #1e293b;
+            font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+        .traffic-light { width: 11px; height: 11px; border-radius: 50%; }
+        .traffic-light.red { background: #ff5f57; }
+        .traffic-light.yellow { background: #febc2e; }
+        .traffic-light.green { background: #28c840; margin-right: 8px; }
+        .terminal {
+            height: min(62vh, 600px);
+            min-height: 360px;
+            overflow: auto;
+            padding: 14px 16px;
+            color: #cbd5e1;
+            font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            scrollbar-color: #334155 #0f172a;
+        }
+        .log-line { display: grid; grid-template-columns: 94px minmax(110px, 170px) 54px 1fr; gap: 10px; padding: 2px 0; }
+        .log-time { color: #64748b; }
+        .log-device { color: #38bdf8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-level { font-weight: 700; text-transform: uppercase; }
+        .log-level.debug { color: #a78bfa; }
+        .log-level.info { color: #4ade80; }
+        .log-level.warn { color: #fbbf24; }
+        .log-level.error { color: #fb7185; }
+        .log-message { color: #e2e8f0; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .empty-state { display: grid; place-items: center; height: 100%; min-height: 320px; color: #64748b; text-align: center; }
+        .empty-state strong { display: block; margin-bottom: 5px; color: #94a3b8; }
+        .terminal-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--text-muted); font-size: 11px; }
+        code { color: #9a3412; background: #ffedd5; padding: 1px 4px; border-radius: 4px; }
+
+        @media (max-width: 800px) {
+            header { padding: 16px 18px; }
+            .toolbar { grid-template-columns: 1fr 1fr; }
+            .toolbar input { grid-column: span 2; }
+            .log-line { grid-template-columns: 78px 1fr; gap: 3px 8px; margin-bottom: 8px; }
+            .log-level { grid-column: 1; }
+            .log-message { grid-column: 2; }
+        }
+        @media (max-width: 520px) {
+            .page-heading { flex-direction: column; }
+            .header-actions span { display: none; }
+            .toolbar { grid-template-columns: 1fr; }
+            .toolbar input { grid-column: auto; }
+            .terminal { height: 58vh; padding: 12px; }
+            .terminal-footer { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>OTA <span>Mertani</span></h1>
+    <div class="header-actions">
+        <span style="font-size:13px;color:var(--text-muted);font-weight:500;">MTI2 · Serial Monitor</span>
+        <form action="/api/auth/logout" method="post"><button class="btn-logout" type="submit">Keluar</button></form>
+    </div>
+</header>
+
+<main class="main-container">
+    <div class="page-heading">
+        <div>
+            <h2>Serial Monitor</h2>
+            <p>Log perangkat tampil secara langsung dari endpoint <code>POST /api/serial/logs</code>.</p>
+        </div>
+        <span id="connectionStatus" class="connection-status offline">Menghubungkan</span>
+    </div>
+
+    <section class="card">
+        <div class="toolbar">
+            <input id="searchInput" type="search" placeholder="Cari isi log…" aria-label="Cari isi log">
+            <select id="levelFilter" aria-label="Filter level">
+                <option value="">Semua level</option>
+                <option value="debug">Debug</option>
+                <option value="info">Info</option>
+                <option value="warn">Warning</option>
+                <option value="error">Error</option>
+            </select>
+            <select id="deviceFilter" aria-label="Filter device"><option value="">Semua device</option></select>
+            <button id="pauseButton" class="btn-secondary" type="button">Jeda</button>
+            <button id="clearButton" class="btn-danger" type="button">Bersihkan</button>
+        </div>
+
+        <div class="terminal-shell">
+            <div class="terminal-titlebar">
+                <span class="traffic-light red"></span><span class="traffic-light yellow"></span><span class="traffic-light green"></span>
+                mertani-device-logs
+            </div>
+            <div id="terminal" class="terminal" aria-live="polite"></div>
+        </div>
+        <div class="terminal-footer">
+            <span id="logCount">0 log ditampilkan</span>
+            <span>Buffer server bersifat sementara dan dibersihkan saat server dimulai ulang.</span>
+        </div>
+    </section>
+</main>
+
+<nav class="mac-dock" aria-label="Navigasi utama">
+    <a class="dock-item" href="/" aria-label="Dashboard OTA">
+        <span class="dock-label">Dashboard OTA</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+    </a>
+    <a class="dock-item active" href="/monitor" aria-current="page" aria-label="Serial Monitor">
+        <span class="dock-label">Serial Monitor</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15H17"/></svg>
+    </a>
+</nav>
+
+<script>
+    const terminal = document.getElementById('terminal');
+    const searchInput = document.getElementById('searchInput');
+    const levelFilter = document.getElementById('levelFilter');
+    const deviceFilter = document.getElementById('deviceFilter');
+    const pauseButton = document.getElementById('pauseButton');
+    const clearButton = document.getElementById('clearButton');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const logCount = document.getElementById('logCount');
+    let logs = [];
+    let paused = false;
+
+    function addDeviceOption(devid) {
+        if ([...deviceFilter.options].some(option => option.value === devid)) return;
+        const option = document.createElement('option');
+        option.value = devid;
+        option.textContent = devid;
+        deviceFilter.appendChild(option);
+    }
+
+    function matchesFilters(entry) {
+        const query = searchInput.value.trim().toLowerCase();
+        return (!deviceFilter.value || entry.devid === deviceFilter.value)
+            && (!levelFilter.value || entry.level === levelFilter.value)
+            && (!query || entry.message.toLowerCase().includes(query));
+    }
+
+    function makeLogLine(entry) {
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        const time = document.createElement('span');
+        const device = document.createElement('span');
+        const level = document.createElement('span');
+        const message = document.createElement('span');
+        time.className = 'log-time';
+        device.className = 'log-device';
+        level.className = `log-level ${entry.level}`;
+        message.className = 'log-message';
+        time.textContent = new Date(entry.timestamp).toLocaleTimeString('id-ID', { hour12: false });
+        device.textContent = entry.devid;
+        device.title = entry.devid;
+        level.textContent = entry.level;
+        message.textContent = entry.message;
+        line.append(time, device, level, message);
+        return line;
+    }
+
+    function renderLogs() {
+        const visible = logs.filter(matchesFilters);
+        terminal.replaceChildren();
+        if (!visible.length) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.innerHTML = '<div><strong>Belum ada data serial</strong>Kirim log dari device untuk melihat data di sini.</div>';
+            terminal.appendChild(empty);
+        } else {
+            const fragment = document.createDocumentFragment();
+            visible.forEach(entry => fragment.appendChild(makeLogLine(entry)));
+            terminal.appendChild(fragment);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        logCount.textContent = `${visible.length} log ditampilkan`;
+    }
+
+    async function loadLogs() {
+        const response = await fetch('/api/admin/serial/logs?limit=500');
+        if (response.status === 401) return window.location.assign('/login');
+        if (!response.ok) throw new Error('Gagal memuat log');
+        const result = await response.json();
+        logs = result.data;
+        result.devices.forEach(addDeviceOption);
+        renderLogs();
+    }
+
+    function connectStream() {
+        const stream = new EventSource('/api/admin/serial/stream');
+        stream.addEventListener('connected', () => {
+            connectionStatus.textContent = 'Live';
+            connectionStatus.classList.remove('offline');
+        });
+        stream.addEventListener('log', event => {
+            const entry = JSON.parse(event.data);
+            addDeviceOption(entry.devid);
+            logs.push(entry);
+            if (logs.length > 1000) logs = logs.slice(-1000);
+            if (!paused) renderLogs();
+        });
+        stream.onerror = () => {
+            connectionStatus.textContent = 'Menghubungkan ulang';
+            connectionStatus.classList.add('offline');
+        };
+    }
+
+    [searchInput, levelFilter, deviceFilter].forEach(control => control.addEventListener('input', renderLogs));
+    pauseButton.addEventListener('click', () => {
+        paused = !paused;
+        pauseButton.textContent = paused ? 'Lanjutkan' : 'Jeda';
+        if (!paused) renderLogs();
+    });
+    clearButton.addEventListener('click', async () => {
+        if (!confirm('Bersihkan seluruh log Serial Monitor?')) return;
+        const response = await fetch('/api/admin/serial/logs', { method: 'DELETE' });
+        if (!response.ok) return alert('Log gagal dibersihkan.');
+        logs = [];
+        renderLogs();
+    });
+
+    loadLogs().catch(() => {
+        connectionStatus.textContent = 'Gagal memuat';
+        connectionStatus.classList.add('offline');
+        renderLogs();
+    });
+    connectStream();
+</script>
+</body>
+</html>
