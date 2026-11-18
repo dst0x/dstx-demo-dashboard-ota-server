@@ -46,7 +46,7 @@ function ensureOtaSchema() {
 
 function normalizeDevid(value) {
     const devid = String(value || '').trim();
-    return /^[1-9]\d{0,19}$/.test(devid) ? devid : null;
+    return /^[A-Za-z0-9._:-]{1,20}$/.test(devid) ? devid : null;
 }
 
 /**
@@ -103,7 +103,7 @@ const checkUpdate = async (req, res) => {
     const devid = normalizeDevid(req.query.devid);
 
     if (!devid) {
-        return res.status(400).json({ error: 'Parameter devid wajib berupa angka UNIX ID yang valid' });
+        return res.status(400).json({ error: 'Parameter devid wajib diisi dan hanya boleh berisi huruf, angka, titik, garis, titik dua, atau underscore (maks 20 karakter)' });
     }
 
     try {
@@ -121,14 +121,14 @@ const checkUpdate = async (req, res) => {
                         SELECT 1
                         FROM ota_download_acks a
                         WHERE a.firmware_id = f.id
-                          AND a.devid = $1
+                          AND a.devid = $1::varchar
                           AND a.download_status = TRUE
                     ) AS download_acknowledged
              FROM firmwares f
              WHERE EXISTS (
                        SELECT 1 FROM firmware_targets t
                        WHERE t.firmware_id = f.id
-                         AND (t.devid = $1 OR t.devid = '*')
+                         AND (t.devid = $1::varchar OR t.devid = '*')
                    )
                AND ($2::varchar IS NULL OR f.hardware_target = $2)
              ORDER BY f.id DESC LIMIT 1`,
@@ -173,13 +173,13 @@ const acknowledgeDownload = async (req, res) => {
         await ensureOtaSchema();
         const result = await pool.query(
             `INSERT INTO ota_download_acks (devid, firmware_id, download_status, acknowledged_at)
-             SELECT $1, f.id, $3, CURRENT_TIMESTAMP
+             SELECT $1::varchar, f.id, $3, CURRENT_TIMESTAMP
              FROM firmwares f
              WHERE f.id = $2
                AND EXISTS (
                    SELECT 1 FROM firmware_targets t
                    WHERE t.firmware_id = f.id
-                     AND (t.devid = $1 OR t.devid = '*')
+                     AND (t.devid = $1::varchar OR t.devid = '*')
                )
              ON CONFLICT (devid, firmware_id)
              DO UPDATE SET download_status = EXCLUDED.download_status,
@@ -243,7 +243,7 @@ const downloadLatest = async (req, res) => {
     const devid = normalizeDevid(req.query.devid);
 
     if (!devid) {
-        return res.status(400).json({ error: 'Parameter devid wajib berupa angka UNIX ID yang valid' });
+        return res.status(400).json({ error: 'Parameter devid wajib diisi dan hanya boleh berisi huruf, angka, titik, garis, titik dua, atau underscore (maks 20 karakter)' });
     }
 
     try {
