@@ -72,8 +72,7 @@ app.use('/api/device/modbus', modbusDeviceRoutes);
 app.use('/api/ota', otaRoutes);
 
 app.get('/', requireAuth, (req, res) => {
-    res.set('Cache-Control', 'no-store');
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.redirect('/chat');
 });
 
 if (require.main === module) {

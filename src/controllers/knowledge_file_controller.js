@@ -1,14 +1,44 @@
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 const pool = require('../database/db');
 
-// ── Text extractors ─────────────────────────────────────────
+async function ocrPdf(filePath) {
+    const Tesseract = require('tesseract.js');
+    const tmpDir = path.join('/tmp', 'ocr_' + Date.now());
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    try {
+        execSync(`pdftoppm -png -r 300 -l 30 "${filePath}" "${tmpDir}/page"`, { timeout: 120000 });
+        const images = fs.readdirSync(tmpDir)
+            .filter(f => f.endsWith('.png'))
+            .sort()
+            .slice(0, 30);
+
+        if (!images.length) return '';
+
+        const worker = await Tesseract.createWorker('eng+ind');
+        const pages = [];
+        for (const img of images) {
+            const { data: { text } } = await worker.recognize(path.join(tmpDir, img));
+            if (text.trim()) pages.push(text.trim());
+        }
+        await worker.terminate();
+        return pages.join('\n\n');
+    } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+}
 
 async function extractPdf(filePath) {
     const pdfParse = require('pdf-parse');
     const buffer = fs.readFileSync(filePath);
     const data = await pdfParse(buffer);
-    return data.text;
+    const text = (data.text || '').replace(/\x00/g, '').trim();
+    if (text.length >= 100) return text;
+    console.log(`[KnowledgeFile] pdf-parse got ${text.length} chars, falling back to OCR: ${filePath}`);
+    const ocrText = await ocrPdf(filePath);
+    return ocrText || text;
 }
 
 async function extractDocx(filePath) {
@@ -63,8 +93,6 @@ async function extractText(filePath, mimeOrExt) {
         return null;
     }
 }
-
-// ── Upload ──────────────────────────────────────────────────
 
 const uploadKnowledgeFile = async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'File tidak ditemukan' });
