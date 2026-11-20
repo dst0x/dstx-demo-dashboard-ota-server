@@ -95,6 +95,20 @@ const createTables = async () => {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS knowledge_files (
+            id             SERIAL PRIMARY KEY,
+            original_name  VARCHAR(255) NOT NULL,
+            file_type      VARCHAR(20)  NOT NULL,
+            file_size      INTEGER      NOT NULL,
+            file_path      VARCHAR(500) NOT NULL,
+            extracted_text TEXT,
+            text_search    TSVECTOR,
+            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_knowledge_files_search
+            ON knowledge_files USING GIN(text_search);
     `;
 
     try {

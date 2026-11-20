@@ -1,4 +1,5 @@
 const pool = require('../database/db');
+const { searchKnowledgeFiles } = require('./knowledge_file_controller');
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 
@@ -85,15 +86,29 @@ const chatStream = async (req, res) => {
     res.flushHeaders();
 
     try {
-        const systemPrompt = await buildSystemPrompt();
         const lastUserMsg = messages[messages.length - 1];
+        const userQuery = lastUserMsg?.role === 'user' ? lastUserMsg.content : '';
+
+        // Search uploaded knowledge files
+        const fileHits = userQuery ? await searchKnowledgeFiles(userQuery) : [];
+
+        // Build system prompt: base KB + file excerpts
+        let systemPrompt = await buildSystemPrompt();
+        if (fileHits.length) {
+            systemPrompt += '\n\n=== DOKUMEN RELEVAN ===\n';
+            systemPrompt += 'Gunakan kutipan dokumen berikut sebagai referensi utama untuk menjawab. Parafrase dan rangkum dengan bahasa yang jelas.\n';
+            for (const hit of fileHits) {
+                systemPrompt += `\n📄 ${hit.original_name} (${hit.file_type.toUpperCase()})\n${hit.excerpt}\n`;
+            }
+            systemPrompt += '\n=== END DOKUMEN ===\n';
+        }
 
         // Save user message
         let sessionId = null;
         if (session_key) {
             sessionId = await getOrCreateSession(session_key);
-            if (lastUserMsg?.role === 'user') {
-                await saveMessage(sessionId, 'user', lastUserMsg.content);
+            if (userQuery) {
+                await saveMessage(sessionId, 'user', userQuery);
             }
         }
 

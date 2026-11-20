@@ -122,7 +122,43 @@
         .send-btn svg { width: 16px; height: 16px; }
         .input-hint { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: center; }
 
-        @media (max-width: 600px) { .sidebar { display: none; } .msg { max-width: 90%; } }
+        /* Mobile hamburger button */
+        .btn-menu {
+            display: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+            background: #fff; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .btn-menu svg { width: 18px; height: 18px; color: var(--text); }
+
+        /* Mobile sidebar drawer */
+        .sidebar-overlay {
+            display: none; position: fixed; inset: 0; z-index: 300;
+            background: rgba(15,23,42,.4); backdrop-filter: blur(2px);
+        }
+        .sidebar-overlay.open { display: block; }
+        .sidebar-drawer {
+            position: fixed; top: 0; left: 0; height: 100%; width: 280px; z-index: 301;
+            background: #fff; border-right: 1px solid var(--border);
+            overflow-y: auto; transform: translateX(-100%);
+            transition: transform .25s cubic-bezier(.4,0,.2,1);
+        }
+        .sidebar-drawer.open { transform: translateX(0); }
+        .drawer-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0;
+            background: #fff; z-index: 1;
+        }
+        .drawer-header span { font-size: 14px; font-weight: 700; color: var(--text); }
+        .btn-close-drawer {
+            width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border);
+            background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-close-drawer svg { width: 14px; height: 14px; color: var(--muted); }
+
+        @media (max-width: 600px) {
+            .sidebar { display: none; }
+            .msg { max-width: 90%; }
+            .btn-menu { display: flex; }
+        }
 
         /* Modal */
         .modal-overlay {
@@ -164,6 +200,34 @@
         .btn-danger-sm { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
         .btn-danger-sm:hover { background: #fee2e2; }
 
+        /* Modal tabs */
+        .modal-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; }
+        .modal-tab { padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .modal-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .modal-tab-pane { display: none; }
+        .modal-tab-pane.active { display: flex; flex-direction: column; gap: 12px; }
+
+        /* File upload */
+        .upload-zone {
+            border: 2px dashed var(--border); border-radius: 10px; padding: 28px 20px;
+            text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+        }
+        .upload-zone:hover, .upload-zone.drag { border-color: var(--primary); background: var(--primary-light); }
+        .upload-zone svg { width: 32px; height: 32px; color: var(--muted); margin-bottom: 8px; }
+        .upload-zone p { margin: 0; font-size: 13px; color: var(--muted); }
+        .upload-zone strong { color: var(--primary); }
+        .upload-zone input[type=file] { display: none; }
+        .upload-progress { display: none; font-size: 13px; color: var(--muted); text-align: center; padding: 8px; }
+        .file-list { display: flex; flex-direction: column; gap: 8px; }
+        .file-item {
+            border: 1px solid var(--border); border-radius: 9px; padding: 10px 14px;
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff;
+        }
+        .file-item-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+        .file-type-badge { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; background: #f1f5f9; color: var(--muted); flex-shrink: 0; }
+        .file-item-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-item-meta { font-size: 11px; color: var(--muted); }
+
         /* KB list */
         .kb-list { display: flex; flex-direction: column; gap: 8px; }
         .kb-item {
@@ -201,11 +265,83 @@
         Asisten <span>Mertani</span>
     </h1>
     <div class="header-actions">
+        <button class="btn-menu" onclick="openDrawer()" title="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
         <form method="post" action="/api/auth/logout">
             <button type="submit" class="btn-logout">Logout</button>
         </form>
     </div>
 </header>
+
+<!-- Mobile sidebar drawer -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeDrawer()"></div>
+<div class="sidebar-drawer" id="sidebarDrawer">
+    <div class="drawer-header">
+        <span>Menu</span>
+        <button class="btn-close-drawer" onclick="closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-title">Riwayat Chat</div>
+        <div class="sidebar-hist" id="historyListDrawer">
+            <div class="hist-empty">Belum ada riwayat.</div>
+        </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+        <div class="sidebar-title">Topik Umum</div>
+        <button class="topic-btn" onclick="askTopic('Apa itu Mertani Datalogger?');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Tentang Produk
+        </button>
+        <button class="topic-btn" onclick="askTopic('Bagaimana cara melakukan OTA update firmware?');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Update Firmware
+        </button>
+        <button class="topic-btn" onclick="askTopic('Bagaimana cara membaca sensor via Modbus?');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="6" height="14" rx="2"/><rect x="16" y="5" width="6" height="14" rx="2"/><path d="M8 9h8m-3-3 3 3-3 3"/></svg>
+            Modbus & Sensor
+        </button>
+        <button class="topic-btn" onclick="askTopic('Bagaimana cara melihat log serial device?');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3M12.5 15H17"/></svg>
+            Serial Monitor
+        </button>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+        <div class="sidebar-title">Kendala & Solusi</div>
+        <button class="topic-btn" onclick="askTopic('Device tidak terdeteksi atau tidak muncul di dashboard');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Device Tidak Muncul
+        </button>
+        <button class="topic-btn" onclick="askTopic('OTA update gagal atau tidak mau download firmware');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+            OTA Gagal
+        </button>
+        <button class="topic-btn" onclick="askTopic('Pembacaan sensor salah atau tidak akurat');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Sensor Tidak Akurat
+        </button>
+        <button class="topic-btn" onclick="askTopic('Koneksi WiFi ESP32 sering putus');closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            Koneksi WiFi
+        </button>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+        <div class="sidebar-title">Lainnya</div>
+        <button class="topic-btn" onclick="openKbModal();closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Kelola Knowledge Base
+        </button>
+        <button class="topic-btn" onclick="clearChat();closeDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Bersihkan Chat
+        </button>
+    </div>
+</div>
 
 <div class="chat-layout">
 
@@ -309,41 +445,65 @@
             <h3>📚 Knowledge Base Asisten</h3>
             <button class="modal-close" onclick="closeKbModal()">×</button>
         </div>
+        <!-- Tabs -->
+        <div class="modal-tabs">
+            <button class="modal-tab active" onclick="switchKbTab('text',this)">✏️ Teks</button>
+            <button class="modal-tab" onclick="switchKbTab('files',this)">📂 File Dokumen</button>
+        </div>
         <div class="modal-body">
-            <!-- Form tambah/edit -->
-            <div class="kb-form">
-                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;" id="kbFormTitle">+ Tambah Knowledge Baru</div>
-                <input type="hidden" id="kbEditId">
-                <div class="kb-row">
-                    <div class="kb-field">
-                        <label>Judul</label>
-                        <input id="kbTitle" type="text" placeholder="Contoh: Sensor Suhu SHT30">
+            <!-- Tab: Teks -->
+            <div class="modal-tab-pane active" id="kbTabText">
+                <div class="kb-form">
+                    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;" id="kbFormTitle">+ Tambah Knowledge Baru</div>
+                    <input type="hidden" id="kbEditId">
+                    <div class="kb-row">
+                        <div class="kb-field">
+                            <label>Judul</label>
+                            <input id="kbTitle" type="text" placeholder="Contoh: Sensor Suhu SHT30">
+                        </div>
+                        <div class="kb-field">
+                            <label>Kategori</label>
+                            <input id="kbCategory" type="text" placeholder="Sensor / Produk / SOP / Perusahaan" list="kbCatList">
+                            <datalist id="kbCatList">
+                                <option value="Sensor">
+                                <option value="Produk">
+                                <option value="SOP">
+                                <option value="Perusahaan">
+                                <option value="Firmware">
+                                <option value="Troubleshooting">
+                                <option value="Umum">
+                            </datalist>
+                        </div>
                     </div>
                     <div class="kb-field">
-                        <label>Kategori</label>
-                        <input id="kbCategory" type="text" placeholder="Sensor / Produk / SOP / Perusahaan" list="kbCatList">
-                        <datalist id="kbCatList">
-                            <option value="Sensor">
-                            <option value="Produk">
-                            <option value="SOP">
-                            <option value="Perusahaan">
-                            <option value="Firmware">
-                            <option value="Troubleshooting">
-                            <option value="Umum">
-                        </datalist>
+                        <label>Konten</label>
+                        <textarea id="kbContent" placeholder="Tulis informasi lengkap di sini. Contoh: register address, cara baca, spesifikasi sensor, prosedur, dll."></textarea>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-sm btn-primary-sm" onclick="saveKnowledge()">Simpan</button>
+                        <button class="btn-sm" id="kbCancelEdit" onclick="cancelKbEdit()" style="display:none;">Batal Edit</button>
                     </div>
                 </div>
-                <div class="kb-field">
-                    <label>Konten (detail informasi, spesifikasi, langkah-langkah, dll)</label>
-                    <textarea id="kbContent" placeholder="Tulis informasi lengkap di sini. Contoh: register address, cara baca, spesifikasi sensor, prosedur, dll."></textarea>
-                </div>
-                <div style="display:flex;gap:8px;">
-                    <button class="btn-sm btn-primary-sm" onclick="saveKnowledge()">Simpan</button>
-                    <button class="btn-sm" id="kbCancelEdit" onclick="cancelKbEdit()" style="display:none;">Batal Edit</button>
-                </div>
+                <div id="kbList" class="kb-list"><div class="kb-empty">Belum ada knowledge. Tambahkan di atas.</div></div>
             </div>
-            <!-- List -->
-            <div id="kbList" class="kb-list"><div class="kb-empty">Belum ada knowledge. Tambahkan di atas.</div></div>
+
+            <!-- Tab: File Dokumen -->
+            <div class="modal-tab-pane" id="kbTabFiles">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('kbFileInput').click()"
+                     ondragover="event.preventDefault();this.classList.add('drag')"
+                     ondragleave="this.classList.remove('drag')"
+                     ondrop="handleFileDrop(event)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p><strong>Klik atau drag file</strong> ke sini untuk upload</p>
+                    <p style="font-size:11px;margin-top:4px;">PDF · DOCX · XLSX · PPTX · TXT · CSV · MD &nbsp;(maks 20 MB/file · bisa pilih banyak sekaligus)</p>
+                    <input type="file" id="kbFileInput" accept=".pdf,.docx,.xlsx,.xls,.pptx,.txt,.md,.csv" multiple onchange="uploadFiles(this.files)">
+                </div>
+                <div class="upload-progress" id="uploadProgress">⏳ Mengupload dan mengekstrak teks…</div>
+                <div id="kbFileList" class="file-list"><div class="kb-empty">Belum ada file. Upload di atas.</div></div>
+            </div>
         </div>
     </div>
 </div>
@@ -578,25 +738,47 @@ function formatTime(ts) {
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
+function renderHistoryList(containerId, sessions, onClickExtra) {
+    const list = document.getElementById(containerId);
+    if (!list) return;
+    if (!sessions?.length) {
+        list.innerHTML = '<div class="hist-empty">Belum ada riwayat.</div>';
+        return;
+    }
+    list.innerHTML = sessions.map(s => `
+        <button class="hist-item${s.session_key === activeHistKey ? ' active' : ''}"
+                data-key="${s.session_key}"
+                onclick="loadSession('${s.session_key}')${onClickExtra ? ';' + onClickExtra : ''}">
+            <div class="hist-item-preview">${esc(s.preview || 'Percakapan')}</div>
+            <div class="hist-item-time">${formatTime(s.last_message || s.created_at)} · ${s.message_count} pesan</div>
+        </button>`).join('');
+}
+
 async function loadSessions() {
-    const list = document.getElementById('historyList');
     try {
         const res = await fetch('/api/admin/chat/sessions');
         const { sessions } = await res.json();
-        if (!sessions?.length) {
-            list.innerHTML = '<div class="hist-empty">Belum ada riwayat.</div>';
-            return;
-        }
-        list.innerHTML = sessions.map(s => `
-            <button class="hist-item${s.session_key === activeHistKey ? ' active' : ''}"
-                    data-key="${s.session_key}"
-                    onclick="loadSession('${s.session_key}')">
-                <div class="hist-item-preview">${esc(s.preview || 'Percakapan')}</div>
-                <div class="hist-item-time">${formatTime(s.last_message || s.created_at)} · ${s.message_count} pesan</div>
-            </button>`).join('');
+        renderHistoryList('historyList', sessions, null);
+        renderHistoryList('historyListDrawer', sessions, 'closeDrawer()');
     } catch (_) {
-        list.innerHTML = '<div class="hist-empty">Gagal memuat.</div>';
+        const empty = '<div class="hist-empty">Gagal memuat.</div>';
+        const a = document.getElementById('historyList');
+        const b = document.getElementById('historyListDrawer');
+        if (a) a.innerHTML = empty;
+        if (b) b.innerHTML = empty;
     }
+}
+
+// ── Mobile drawer ─────────────────────────────────────────────
+function openDrawer() {
+    document.getElementById('sidebarOverlay').classList.add('open');
+    document.getElementById('sidebarDrawer').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function closeDrawer() {
+    document.getElementById('sidebarOverlay').classList.remove('open');
+    document.getElementById('sidebarDrawer').classList.remove('open');
+    document.body.style.overflow = '';
 }
 
 async function loadSession(key) {
@@ -706,6 +888,100 @@ async function deleteKb(id) {
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── KB Tab switch ─────────────────────────────────────────────
+function switchKbTab(tab, btn) {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.modal-tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(tab === 'text' ? 'kbTabText' : 'kbTabFiles').classList.add('active');
+    if (tab === 'files') loadKbFiles();
+}
+
+// ── File upload ───────────────────────────────────────────────
+function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+}
+
+function handleFileDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.remove('drag');
+    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+}
+
+async function uploadFiles(fileList) {
+    const files = Array.from(fileList);
+    if (!files.length) return;
+    document.getElementById('kbFileInput').value = '';
+
+    const prog = document.getElementById('uploadProgress');
+    prog.style.display = 'block';
+
+    const results = [];
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        prog.textContent = `⏳ [${i + 1}/${files.length}] Mengupload ${file.name}…`;
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/api/admin/chat/knowledge-files', { method: 'POST', body: fd });
+            const json = await res.json();
+            if (res.status === 409 && json.skipped) {
+                results.push({ name: file.name, status: 'skip' });
+            } else if (!res.ok) {
+                throw new Error(json.error || 'Upload gagal');
+            } else {
+                results.push({ name: file.name, status: 'ok' });
+            }
+        } catch (err) {
+            results.push({ name: file.name, status: 'fail', msg: err.message });
+        }
+    }
+
+    await loadKbFiles();
+
+    const ok   = results.filter(r => r.status === 'ok').length;
+    const skip = results.filter(r => r.status === 'skip').length;
+    const fail = results.filter(r => r.status === 'fail');
+
+    const parts = [];
+    if (ok)   parts.push(`✅ ${ok} berhasil`);
+    if (skip) parts.push(`⏭️ ${skip} dilewati (sudah ada)`);
+    if (fail.length) parts.push(`❌ ${fail.length} gagal: ${fail.map(r => r.name).join(', ')}`);
+    prog.textContent = parts.join(' · ');
+    setTimeout(() => { prog.style.display = 'none'; }, 4000);
+}
+
+async function loadKbFiles() {
+    const list = document.getElementById('kbFileList');
+    list.innerHTML = '<div class="kb-empty">Memuat…</div>';
+    try {
+        const res = await fetch('/api/admin/chat/knowledge-files');
+        const { data } = await res.json();
+        if (!data?.length) { list.innerHTML = '<div class="kb-empty">Belum ada file. Upload di atas.</div>'; return; }
+        list.innerHTML = data.map(f => `
+            <div class="file-item">
+                <div class="file-item-info">
+                    <span class="file-type-badge">${esc(f.file_type.toUpperCase())}</span>
+                    <div>
+                        <div class="file-item-name">${esc(f.original_name)}</div>
+                        <div class="file-item-meta">${formatBytes(f.file_size)} · ${Number(f.char_count || 0).toLocaleString()} karakter · ${new Date(f.created_at).toLocaleDateString('id-ID')}</div>
+                    </div>
+                </div>
+                <button class="btn-sm btn-danger-sm" onclick="deleteKbFile(${f.id})">Hapus</button>
+            </div>`).join('');
+    } catch (_) {
+        list.innerHTML = '<div class="kb-empty">Gagal memuat.</div>';
+    }
+}
+
+async function deleteKbFile(id) {
+    if (!confirm('Hapus file ini dari Knowledge Base?')) return;
+    await fetch(`/api/admin/chat/knowledge-files/${id}`, { method: 'DELETE' });
+    await loadKbFiles();
+}
 
 // ── Close modal on overlay click ─────────────────────────────
 document.getElementById('kbModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeKbModal(); });
