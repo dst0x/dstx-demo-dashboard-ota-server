@@ -26,6 +26,10 @@ app.get(['/chat', '/chat.html'], requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'chat.html'));
 });
+app.get(['/review', '/review.html'], requireAuth, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.sendFile(path.join(__dirname, 'public', 'review.html'));
+});
 app.get(['/modbus', '/modbus.html'], requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'modbus.html'));

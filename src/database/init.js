@@ -109,6 +109,14 @@ const createTables = async () => {
 
         CREATE INDEX IF NOT EXISTS idx_knowledge_files_search
             ON knowledge_files USING GIN(text_search);
+
+        CREATE TABLE IF NOT EXISTS chat_feedback (
+            id         SERIAL PRIMARY KEY,
+            message_id BIGINT REFERENCES chat_messages(id) ON DELETE CASCADE,
+            rating     SMALLINT NOT NULL CHECK (rating IN (1, -1)),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (message_id)
+        );
     `;
 
     try {

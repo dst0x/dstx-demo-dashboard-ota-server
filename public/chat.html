@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asisten Mertani · OTA</title>
     <link rel="stylesheet" href="/navigation.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
         :root {
             --primary: #ea580c;
@@ -93,9 +96,86 @@
         }
         .msg.bot .bubble { background: var(--bubble-bot); border: 1px solid var(--border); border-top-left-radius: 4px; }
         .msg.user .bubble { background: var(--bubble-user); color: #fff; border-top-right-radius: 4px; }
-        .bubble ul { margin: 6px 0 0; padding-left: 18px; }
-        .bubble ul li { margin-bottom: 3px; }
+        .bubble p { margin: 0 0 3px; }
+        .bubble p:last-child { margin-bottom: 0; }
+        .bubble ul, .bubble ol { margin: 1px 0 3px; padding-left: 18px; }
+        .bubble ul li, .bubble ol li { margin-bottom: 2px; line-height: 1.5; }
+        .bubble li > p, .bubble li > p:first-child, .bubble li > p:last-child { margin: 0 !important; padding: 0 !important; }
+        .bubble h1, .bubble h2, .bubble h3 { margin: 6px 0 2px; font-size: 13px; font-weight: 700; }
+        .bubble h1 { font-size: 14px; }
         .bubble strong { font-weight: 700; }
+        .bubble em { font-style: italic; }
+        .bubble code {
+            background: #f1f5f9; border-radius: 4px; padding: 1px 5px;
+            font-family: 'Consolas', monospace; font-size: 12px; color: #c2410c;
+        }
+        .msg.user .bubble code { background: rgba(255,255,255,.2); color: #fff; }
+        .bubble pre { margin: 6px 0; padding: 0; background: none; border-radius: 0; }
+        .bubble pre code { background: none; padding: 0; color: inherit; font-size: 12.5px; }
+
+        /* Code block card */
+        .code-block {
+            border-radius: 12px; overflow: hidden; margin: 6px 0;
+            background: #1e1f2e; box-shadow: 0 4px 20px rgba(0,0,0,.35);
+        }
+        .code-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; background: #2a2b3d;
+        }
+        .code-dots { display: flex; gap: 6px; align-items: center; }
+        .code-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+        }
+        .code-dot.red    { background: #ff5f57; }
+        .code-dot.yellow { background: #febc2e; }
+        .code-dot.green  { background: #28c840; }
+        .code-lang { font-size: 11px; color: #6b7280; font-family: 'Consolas', monospace; position: absolute; left: 50%; transform: translateX(-50%); }
+        .code-header { position: relative; }
+        .code-copy {
+            display: flex; align-items: center; gap: 5px; padding: 3px 10px;
+            border-radius: 5px; border: 1px solid #3d3f56; background: none;
+            cursor: pointer; font-size: 11px; color: #9ca3af; transition: all .15s; z-index: 1;
+        }
+        .code-copy:hover { background: #3d3f56; color: #e5e7eb; }
+        .code-copy svg { width: 12px; height: 12px; }
+        .code-body { padding: 12px 18px; overflow-x: auto; background: #1e1f2e; }
+        .code-body pre { margin: 0; }
+        .code-body .hljs {
+            background: transparent !important; padding: 0;
+            font-size: 13px; line-height: 1.7; font-family: 'Consolas', 'Monaco', monospace;
+            color: #abb2bf;
+        }
+        /* atom-one-dark token colors — inlined so they work without CDN */
+        .code-body .hljs-keyword,
+        .code-body .hljs-selector-tag,
+        .code-body .hljs-deletion           { color: #c678dd; }
+        .code-body .hljs-string,
+        .code-body .hljs-attr,
+        .code-body .hljs-addition           { color: #98c379; }
+        .code-body .hljs-number,
+        .code-body .hljs-literal            { color: #d19a66; }
+        .code-body .hljs-comment,
+        .code-body .hljs-quote              { color: #5c6370; font-style: italic; }
+        .code-body .hljs-title,
+        .code-body .hljs-name,
+        .code-body .hljs-function           { color: #61afef; }
+        .code-body .hljs-built_in,
+        .code-body .hljs-class .hljs-title,
+        .code-body .hljs-type               { color: #e5c07b; }
+        .code-body .hljs-variable,
+        .code-body .hljs-params             { color: #e06c75; }
+        .code-body .hljs-tag                { color: #e06c75; }
+        .code-body .hljs-meta               { color: #56b6c2; }
+        .code-body .hljs-operator           { color: #56b6c2; }
+        .code-body .hljs-punctuation        { color: #abb2bf; }
+        .code-body .hljs-property           { color: #e06c75; }
+        .code-footer {
+            padding: 7px 14px; font-size: 11px; color: #4b5280;
+            border-top: 1px solid #2d2f45; background: #2a2b3d;
+        }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+        .bubble a { color: var(--primary); text-decoration: underline; }
+        .msg.user .bubble a { color: #fff; }
         .typing { display: flex; gap: 4px; align-items: center; padding: 12px 16px; }
         .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s infinite; }
         .typing span:nth-child(2) { animation-delay: .2s; }
@@ -153,6 +233,52 @@
             background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
         .btn-close-drawer svg { width: 14px; height: 14px; color: var(--muted); }
+
+        /* Rating buttons */
+        .rating-row { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+        .rating-btn {
+            padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+            background: #fff; cursor: pointer; font-size: 12px; color: var(--muted);
+            transition: all .15s;
+        }
+        .rating-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+        .rating-btn.voted-up   { background: #f0fdf4; border-color: #16a34a; color: #16a34a; }
+        .rating-btn.voted-down { background: #fef2f2; border-color: #dc2626; color: #dc2626; }
+        .rating-btn:disabled { cursor: default; opacity: .7; }
+        .btn-koreksi {
+            padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+            background: #fff; cursor: pointer; font-size: 12px; color: var(--muted);
+            transition: all .15s; margin-left: 2px;
+        }
+        .btn-koreksi:hover { border-color: #7c3aed; color: #7c3aed; background: #f5f3ff; }
+
+        /* Inline correction form */
+        .koreksi-form {
+            margin-top: 8px; border: 1px solid #e9d5ff; border-radius: 10px;
+            background: #faf5ff; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .koreksi-form-title { font-size: 11px; font-weight: 700; color: #7c3aed; display: flex; align-items: center; gap: 6px; }
+        .koreksi-row { display: flex; gap: 8px; }
+        .koreksi-input {
+            flex: 1; padding: 7px 10px; border: 1px solid #ddd6fe; border-radius: 7px;
+            font-size: 12px; font-family: inherit; outline: none; background: #fff;
+        }
+        .koreksi-input:focus { border-color: #7c3aed; }
+        .koreksi-textarea {
+            width: 100%; padding: 7px 10px; border: 1px solid #ddd6fe; border-radius: 7px;
+            font-size: 12px; font-family: inherit; outline: none; resize: vertical;
+            min-height: 80px; background: #fff; box-sizing: border-box;
+        }
+        .koreksi-textarea:focus { border-color: #7c3aed; }
+        .koreksi-select {
+            padding: 7px 10px; border: 1px solid #ddd6fe; border-radius: 7px;
+            font-size: 12px; font-family: inherit; outline: none; background: #fff; cursor: pointer;
+        }
+        .koreksi-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .btn-koreksi-batal { padding: 5px 14px; border-radius: 7px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 12px; }
+        .btn-koreksi-simpan { padding: 5px 14px; border-radius: 7px; border: none; background: #7c3aed; color: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
+        .btn-koreksi-simpan:hover { background: #6d28d9; }
+        .btn-koreksi-simpan:disabled { opacity: .6; cursor: default; }
 
         @media (max-width: 600px) {
             .sidebar { display: none; }
@@ -400,6 +526,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
                 Kelola Knowledge Base
             </button>
+            <a href="/review" style="text-decoration:none;display:block;">
+                <button class="topic-btn" style="width:100%">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    Knowledge Review
+                </button>
+            </a>
             <button class="topic-btn" onclick="clearChat()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Bersihkan Chat
@@ -559,6 +691,71 @@ function hideWelcome() {
     }
 }
 
+// ── Markdown render ──────────────────────────────────────────
+(function setupMarked() {
+    if (typeof marked === 'undefined') return;
+
+    const renderer = new marked.Renderer();
+    renderer.code = function(tokenOrCode, infoLang) {
+        // marked v9 passes a token object; older passes (code, lang)
+        const rawText = typeof tokenOrCode === 'object' ? tokenOrCode.text  : tokenOrCode;
+        const rawLang = typeof tokenOrCode === 'object' ? tokenOrCode.lang  : infoLang;
+        const text = rawText || '';
+        const lang = (rawLang || '').trim().toLowerCase();
+        const label = lang || 'code';
+
+        let highlighted;
+        try {
+            highlighted = lang && hljs.getLanguage(lang)
+                ? hljs.highlight(text, { language: lang }).value
+                : hljs.highlightAuto(text).value;
+        } catch (_) {
+            highlighted = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        const copyId = 'cb-' + Math.random().toString(36).slice(2, 8);
+        return `
+<div class="code-block">
+  <div class="code-header">
+    <div class="code-dots">
+      <div class="code-dot red"></div>
+      <div class="code-dot yellow"></div>
+      <div class="code-dot green"></div>
+    </div>
+    <span class="code-lang">${label}</span>
+    <button class="code-copy" onclick="copyCode('${copyId}',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>Salin
+    </button>
+  </div>
+  <div class="code-body"><pre><code id="${copyId}" class="hljs">${highlighted}</code></pre></div>
+  <div class="code-footer">Gunakan kode dengan hati-hati.</div>
+</div>`;
+    };
+
+    marked.use({ renderer, breaks: true, gfm: true });
+})();
+
+function mdRender(text) {
+    if (typeof marked === 'undefined') return text.replace(/</g,'&lt;');
+    let src = text
+        .replace(/^[•●‣⦿⁃]\s+/gm, '- ')
+        .replace(/\n{2,}(- )/g, '\n$1');
+    let html = marked.parse(src);
+    html = html.replace(/<li>\s*<p>([\s\S]*?)<\/p>\s*<\/li>/g, '<li>$1</li>');
+    return html;
+}
+
+function copyCode(id, btn) {
+    const text = document.getElementById(id)?.innerText || '';
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Disalin!`;
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    });
+}
+
 // ── Render ──────────────────────────────────────────────────
 function appendMsg(role, text) {
     hideWelcome();
@@ -576,7 +773,11 @@ function appendMsg(role, text) {
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = text;
+    if (role === 'bot' && text) {
+        bubble.innerHTML = mdRender(text);
+    } else {
+        bubble.textContent = text;
+    }
 
     div.appendChild(avatar);
     div.appendChild(bubble);
@@ -633,10 +834,12 @@ async function botReply(userText) {
         removeTyping();
         const bubble = appendMsg('bot', '');
         let full = '';
+        let msgId = null;
 
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = '';
+        let lastEvent = '';
 
         while (true) {
             const { done, value } = await reader.read();
@@ -647,13 +850,18 @@ async function botReply(userText) {
 
             for (const line of lines) {
                 const t = line.trim();
+                if (t.startsWith('event: ')) { lastEvent = t.slice(7); continue; }
                 if (t.startsWith('data: ')) {
                     try {
-                        const { delta } = JSON.parse(t.slice(6));
-                        if (delta) { full += delta; bubble.textContent = full; }
+                        const json = JSON.parse(t.slice(6));
+                        if (lastEvent === 'done') {
+                            msgId = json.message_id || null;
+                        } else if (json.delta) {
+                            full += json.delta;
+                            bubble.textContent = full; // plain text saat streaming
+                        }
                     } catch (_) {}
-                } else if (t.startsWith('event: error')) {
-                    // next line has data
+                    lastEvent = '';
                 }
                 const wrap = document.getElementById('messages');
                 wrap.scrollTop = wrap.scrollHeight;
@@ -662,7 +870,8 @@ async function botReply(userText) {
 
         if (full) {
             history.push({ role: 'assistant', content: full });
-            // Refresh history sidebar so new sessions appear
+            bubble.innerHTML = mdRender(full); // render markdown setelah stream selesai
+            if (msgId) addRatingButtons(bubble, msgId);
             loadSessions();
         }
     } catch (err) {
@@ -970,6 +1179,7 @@ async function loadKbFiles() {
                         <div class="file-item-meta">${formatBytes(f.file_size)} · ${Number(f.char_count || 0).toLocaleString()} karakter · ${new Date(f.created_at).toLocaleDateString('id-ID')}</div>
                     </div>
                 </div>
+                <button class="btn-sm" onclick="reextractFile(${f.id}, this)" title="Ekstrak ulang teks dari file">↺</button>
                 <button class="btn-sm btn-danger-sm" onclick="deleteKbFile(${f.id})">Hapus</button>
             </div>`).join('');
     } catch (_) {
@@ -977,10 +1187,122 @@ async function loadKbFiles() {
     }
 }
 
+async function reextractFile(id, btn) {
+    const orig = btn.textContent;
+    btn.textContent = '…'; btn.disabled = true;
+    try {
+        const res = await fetch(`/api/admin/chat/knowledge-files/${id}/reextract`, { method: 'POST' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error);
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+        await loadKbFiles();
+    } catch (e) {
+        btn.textContent = '!'; btn.disabled = false;
+        alert('Gagal re-extract: ' + e.message);
+    }
+}
+
 async function deleteKbFile(id) {
     if (!confirm('Hapus file ini dari Knowledge Base?')) return;
     await fetch(`/api/admin/chat/knowledge-files/${id}`, { method: 'DELETE' });
     await loadKbFiles();
+}
+
+// ── Rating (thumbs up/down) + Koreksi ────────────────────────
+function addRatingButtons(bubble, messageId) {
+    // Ambil pertanyaan user dari pesan sebelumnya
+    const msgWrap = bubble.closest('.msg');
+    let question = '';
+    let prev = msgWrap?.previousElementSibling;
+    while (prev) {
+        if (prev.classList.contains('msg') && prev.classList.contains('user')) {
+            question = prev.querySelector('.bubble')?.textContent || '';
+            break;
+        }
+        prev = prev.previousElementSibling;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'rating-row';
+    row.innerHTML = `
+        <button class="rating-btn" id="ru-${messageId}" onclick="submitRating(${messageId}, 1, this)">👍</button>
+        <button class="rating-btn" id="rd-${messageId}" onclick="submitRating(${messageId}, -1, this)">👎</button>
+        <button class="btn-koreksi" onclick="toggleKoreksi(${messageId}, this)" title="Koreksi jawaban & simpan ke KB">✏️ Koreksi</button>`;
+    bubble.parentElement.appendChild(row);
+
+    // Form koreksi (tersembunyi)
+    const form = document.createElement('div');
+    form.className = 'koreksi-form';
+    form.id = `koreksi-form-${messageId}`;
+    form.style.display = 'none';
+    const cats = ['Sensor','OTA Firmware','Modbus','WiFi & Koneksi','Serial Monitor','Troubleshooting','Umum'];
+    form.innerHTML = `
+        <div class="koreksi-form-title">✏️ Koreksi &amp; Simpan ke Knowledge Base</div>
+        <div class="koreksi-row">
+            <input class="koreksi-input" id="kt-${messageId}" placeholder="Judul (topik pertanyaan)" value="${esc(question).slice(0,80)}">
+            <select class="koreksi-select" id="kc-${messageId}">
+                ${cats.map(c => `<option>${c}</option>`).join('')}
+            </select>
+        </div>
+        <textarea class="koreksi-textarea" id="kk-${messageId}" placeholder="Tulis jawaban yang benar di sini…">${esc(bubble.textContent)}</textarea>
+        <div class="koreksi-actions">
+            <button class="btn-koreksi-batal" onclick="toggleKoreksi(${messageId})">Batal</button>
+            <button class="btn-koreksi-simpan" id="ks-${messageId}" onclick="simpanKoreksi(${messageId})">💾 Simpan ke KB</button>
+        </div>`;
+    bubble.parentElement.appendChild(form);
+}
+
+function toggleKoreksi(messageId) {
+    const form = document.getElementById(`koreksi-form-${messageId}`);
+    const isOpen = form.style.display !== 'none';
+    form.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) document.getElementById(`kt-${messageId}`).focus();
+}
+
+async function simpanKoreksi(messageId) {
+    const title   = document.getElementById(`kt-${messageId}`).value.trim();
+    const category = document.getElementById(`kc-${messageId}`).value;
+    const content = document.getElementById(`kk-${messageId}`).value.trim();
+    if (!title || !content) { alert('Judul dan isi wajib diisi.'); return; }
+
+    const btn = document.getElementById(`ks-${messageId}`);
+    btn.disabled = true; btn.textContent = 'Menyimpan…';
+
+    try {
+        const res = await fetch('/api/admin/chat/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, category, content }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        btn.textContent = '✅ Tersimpan!';
+        setTimeout(() => {
+            document.getElementById(`koreksi-form-${messageId}`).style.display = 'none';
+            btn.textContent = '💾 Simpan ke KB';
+            btn.disabled = false;
+        }, 1800);
+    } catch (e) {
+        btn.textContent = '💾 Simpan ke KB'; btn.disabled = false;
+        alert('Gagal menyimpan: ' + e.message);
+    }
+}
+
+async function submitRating(messageId, rating, btn) {
+    const upBtn   = document.getElementById(`ru-${messageId}`);
+    const downBtn = document.getElementById(`rd-${messageId}`);
+    try {
+        await fetch('/api/admin/chat/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message_id: messageId, rating }),
+        });
+        upBtn.classList.toggle('voted-up',   rating === 1);
+        downBtn.classList.toggle('voted-down', rating === -1);
+        upBtn.classList.remove('voted-down');
+        downBtn.classList.remove('voted-up');
+        upBtn.disabled = downBtn.disabled = true;
+    } catch (_) {}
 }
 
 // ── Close modal on overlay click ─────────────────────────────

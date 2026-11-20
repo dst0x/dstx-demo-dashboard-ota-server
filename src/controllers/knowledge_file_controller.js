@@ -158,34 +158,38 @@ function extractKeywords(query) {
     )];
 }
 
-function extractExcerpt(text, keywords, maxLen = 1200) {
-    const lower = text.toLowerCase();
-    const CHUNK = 600;   // chars per chunk
-    const STEP = 300;    // overlap stride
+// Konversi keyword ke pola regex PostgreSQL.
+// "mec20"  → "mec[^a-z0-9]?20"   cocok dengan mec20, MEC-20, MEC 20, MEC_20
+// "s300n"  → "s[^a-z0-9]?300[^a-z0-9]?n"
+function kwToRegex(kw) {
+    return kw
+        .replace(/([a-zA-Z])(\d)/g, '$1[^a-zA-Z0-9]?$2')
+        .replace(/(\d)([a-zA-Z])/g, '$1[^a-zA-Z0-9]?$2');
+}
+
+function extractExcerpt(text, kwRegexes, maxLen = 1200) {
+    const CHUNK = 600;
+    const STEP = 300;
 
     let bestScore = -1;
     let bestIdx = 0;
 
-    // Slide window, score each chunk by keyword hits + proximity bonus
-    for (let i = 0; i < lower.length - CHUNK; i += STEP) {
-        const chunk = lower.slice(i, i + CHUNK);
+    for (let i = 0; i < text.length - CHUNK; i += STEP) {
+        const chunk = text.slice(i, i + CHUNK);
         let score = 0;
-        for (const kw of keywords) {
-            if (chunk.includes(kw.toLowerCase())) score++;
+        for (const rx of kwRegexes) {
+            if (rx.test(chunk)) score++;
         }
-        // Skip chunks that are mostly header/footer noise (very short lines)
         if (score > bestScore) { bestScore = score; bestIdx = i; }
     }
 
     if (bestScore === 0) return text.slice(0, 400);
 
-    // If multiple chunks have same score, prefer ones deeper in the doc (past first 10%)
     const bodyStart = Math.floor(text.length * 0.08);
     if (bestIdx < bodyStart) {
-        // Try to find equal-score chunk further in
-        for (let i = bodyStart; i < lower.length - CHUNK; i += STEP) {
-            const chunk = lower.slice(i, i + CHUNK);
-            let score = keywords.reduce((s, k) => s + (chunk.includes(k.toLowerCase()) ? 1 : 0), 0);
+        for (let i = bodyStart; i < text.length - CHUNK; i += STEP) {
+            const chunk = text.slice(i, i + CHUNK);
+            const score = kwRegexes.reduce((s, rx) => s + (rx.test(chunk) ? 1 : 0), 0);
             if (score >= bestScore) { bestIdx = i; break; }
         }
     }
@@ -201,13 +205,19 @@ async function searchKnowledgeFiles(query, limit = 4) {
     const keywords = extractKeywords(query);
     if (!keywords.length) return [];
 
+    // Build JS regexes (case-insensitive, fuzzy separator) for excerpt scoring
+    const kwRegexes = keywords.map(kw => new RegExp(kwToRegex(kw), 'i'));
+
+    // Build PostgreSQL regex patterns for fuzzy matching
+    const pgPatterns = keywords.map(kw => kwToRegex(kw));
+
     try {
-        const conditions = keywords.map((_, i) => `extracted_text ILIKE $${i + 1}`);
-        const params = keywords.map(k => `%${k}%`);
+        const conditions = pgPatterns.map((_, i) => `extracted_text ~* $${i + 1}`);
+        const params = pgPatterns;
 
         const result = await pool.query(
             `SELECT id, original_name, file_type, extracted_text,
-                    (${keywords.map((_, i) => `CASE WHEN extracted_text ILIKE $${i + 1} THEN 1 ELSE 0 END`).join(' + ')}) AS score
+                    (${pgPatterns.map((_, i) => `CASE WHEN extracted_text ~* $${i + 1} THEN 1 ELSE 0 END`).join(' + ')}) AS score
              FROM knowledge_files
              WHERE ${conditions.join(' OR ')}
              ORDER BY score DESC
@@ -218,7 +228,7 @@ async function searchKnowledgeFiles(query, limit = 4) {
         return result.rows.map(row => ({
             original_name: row.original_name,
             file_type: row.file_type,
-            excerpt: extractExcerpt(row.extracted_text, keywords),
+            excerpt: extractExcerpt(row.extracted_text, kwRegexes),
         }));
     } catch (e) {
         console.error('[KnowledgeSearch]', e.message);
@@ -226,4 +236,28 @@ async function searchKnowledgeFiles(query, limit = 4) {
     }
 }
 
-module.exports = { uploadKnowledgeFile, listKnowledgeFiles, deleteKnowledgeFile, searchKnowledgeFiles };
+// ── Re-extract ──────────────────────────────────────────────
+
+const reextractFile = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const row = await pool.query(`SELECT * FROM knowledge_files WHERE id=$1`, [id]);
+        if (!row.rowCount) return res.status(404).json({ error: 'File tidak ditemukan' });
+
+        const file = row.rows[0];
+        const text = await extractText(file.file_path);
+        if (!text) return res.status(422).json({ error: 'Gagal mengekstrak teks dari file' });
+
+        await pool.query(
+            `UPDATE knowledge_files
+             SET extracted_text = $1, text_search = to_tsvector('simple', $1)
+             WHERE id = $2`,
+            [text, id]
+        );
+        res.json({ success: true, char_count: text.length });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+module.exports = { uploadKnowledgeFile, listKnowledgeFiles, deleteKnowledgeFile, reextractFile, searchKnowledgeFiles };

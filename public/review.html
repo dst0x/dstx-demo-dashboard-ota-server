@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Review · Mertani</title>
+    <link rel="stylesheet" href="/navigation.css">
+    <style>
+        :root {
+            --primary: #ea580c;
+            --primary-light: #fff7ed;
+            --border: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --bg: #f8fafc;
+            --green: #16a34a;
+            --red: #dc2626;
+            --green-light: #f0fdf4;
+            --red-light: #fef2f2;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 24px; border-bottom: 1px solid var(--border); background: #fff;
+        }
+        header h1 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+        header h1 span { color: var(--primary); }
+        .btn-logout { padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600;
+            cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text); }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+
+        /* Stats */
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+        .stat-card {
+            background: #fff; border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px 24px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .07em; color: var(--muted); }
+        .stat-value { font-size: 32px; font-weight: 800; color: var(--text); }
+        .stat-value.green { color: var(--green); }
+        .stat-value.red   { color: var(--red); }
+
+        /* Section */
+        .section { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 24px; }
+        .section-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .section-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .section-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .empty-state { text-align: center; padding: 32px; color: var(--muted); font-size: 13px; }
+
+        /* Bad answer card */
+        .ba-card {
+            border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+        }
+        .ba-question {
+            background: var(--red-light); padding: 10px 14px;
+            font-size: 12px; font-weight: 600; color: var(--red); border-bottom: 1px solid #fecaca;
+        }
+        .ba-question span { font-weight: 400; color: var(--text); }
+        .ba-answer {
+            padding: 10px 14px; font-size: 12px; color: var(--muted); line-height: 1.6;
+            max-height: 100px; overflow: hidden; position: relative;
+        }
+        .ba-answer.expanded { max-height: none; }
+        .ba-actions { padding: 8px 14px; display: flex; gap: 8px; border-top: 1px solid var(--border); background: #fafafa; }
+        .btn-sm { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text); }
+        .btn-sm:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+        .btn-sm.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-sm.primary:hover { background: #c2410c; }
+        .ba-time { font-size: 10px; color: var(--muted); margin-left: auto; align-self: center; }
+
+        /* Top questions */
+        .tq-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .tq-row:last-child { border-bottom: none; }
+        .tq-count { font-size: 11px; font-weight: 700; color: var(--primary);
+            background: var(--primary-light); border-radius: 20px; padding: 2px 10px; flex-shrink: 0; }
+        .tq-text { font-size: 13px; flex: 1; }
+        .btn-ask { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+            cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--muted); flex-shrink: 0; }
+        .btn-ask:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+        /* Add to KB modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; z-index: 200;
+            background: rgba(15,23,42,.45); backdrop-filter: blur(4px);
+            align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #fff; border-radius: 16px; width: 540px; max-width: 95vw;
+            max-height: 90vh; overflow-y: auto; }
+        .modal-header { padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; }
+        .modal-header h2 { margin: 0; font-size: 16px; }
+        .modal-close { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border);
+            background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+        label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
+        input, textarea, select {
+            width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+            font-size: 13px; font-family: inherit; outline: none; resize: vertical;
+        }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+        .btn-cancel { padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+            background: #fff; cursor: pointer; font-size: 13px; }
+        .btn-save { padding: 8px 18px; border-radius: 8px; border: none;
+            background: var(--primary); color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .btn-save:hover { background: #c2410c; }
+
+        @media (max-width: 600px) {
+            .stats-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.8">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        Knowledge <span>Review</span>
+    </h1>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <a href="/chat" style="text-decoration:none;">
+            <button class="btn-logout">← Kembali ke Chat</button>
+        </a>
+        <form method="post" action="/api/auth/logout">
+            <button type="submit" class="btn-logout">Logout</button>
+        </form>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Stats -->
+    <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+            <div class="stat-label">Total Pertanyaan</div>
+            <div class="stat-value" id="statTotal">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">👍 Jawaban Bagus</div>
+            <div class="stat-value green" id="statUp">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">👎 Perlu Diperbaiki</div>
+            <div class="stat-value red" id="statDown">—</div>
+        </div>
+    </div>
+
+    <!-- Bad answers -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">👎 Jawaban yang Perlu Diperbaiki</div>
+            <button class="btn-sm" onclick="loadData()">Refresh</button>
+        </div>
+        <div class="section-body" id="badAnswersList">
+            <div class="empty-state">Memuat…</div>
+        </div>
+    </div>
+
+    <!-- Top questions -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">🔥 Pertanyaan Paling Sering Ditanyakan</div>
+        </div>
+        <div class="section-body" id="topQuestionsList">
+            <div class="empty-state">Memuat…</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Add to KB Modal -->
+<div class="modal-overlay" id="kbModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Tambah ke Knowledge Base</h2>
+            <button class="modal-close" onclick="closeModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div>
+                <label>Judul</label>
+                <input type="text" id="kbTitle" placeholder="Contoh: Cara ganti address Sensor THETA">
+            </div>
+            <div>
+                <label>Kategori</label>
+                <select id="kbCategory">
+                    <option>Sensor</option>
+                    <option>OTA Firmware</option>
+                    <option>Modbus</option>
+                    <option>WiFi & Koneksi</option>
+                    <option>Serial Monitor</option>
+                    <option>Troubleshooting</option>
+                    <option>Umum</option>
+                </select>
+            </div>
+            <div>
+                <label>Isi Jawaban</label>
+                <textarea id="kbContent" rows="7" placeholder="Tulis jawaban yang benar di sini…"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeModal()">Batal</button>
+                <button class="btn-save" onclick="saveToKb()">Simpan ke KB</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timeAgo(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - new Date(ts);
+    if (diff < 60000) return 'Baru saja';
+    if (diff < 3600000) return Math.floor(diff/60000) + ' mnt lalu';
+    if (diff < 86400000) return Math.floor(diff/3600000) + ' jam lalu';
+    return new Date(ts).toLocaleDateString('id-ID', { day:'numeric', month:'short' });
+}
+
+async function loadData() {
+    try {
+        const res = await fetch('/api/admin/chat/review');
+        const { stats, bad_answers, top_questions } = await res.json();
+
+        document.getElementById('statTotal').textContent = Number(stats.total_questions).toLocaleString();
+        document.getElementById('statUp').textContent = Number(stats.thumbs_up).toLocaleString();
+        document.getElementById('statDown').textContent = Number(stats.thumbs_down).toLocaleString();
+
+        // Bad answers
+        const baList = document.getElementById('badAnswersList');
+        if (!bad_answers.length) {
+            baList.innerHTML = '<div class="empty-state">Belum ada jawaban yang di-thumbs down. 🎉</div>';
+        } else {
+            baList.innerHTML = bad_answers.map((b, i) => `
+                <div class="ba-card">
+                    <div class="ba-question">❓ Pertanyaan: <span>${esc(b.question || '(tidak diketahui)')}</span></div>
+                    <div class="ba-answer" id="ba-ans-${i}">${esc(b.answer)}</div>
+                    <div class="ba-actions">
+                        <button class="btn-sm" onclick="toggleExpand('ba-ans-${i}', this)">Lihat selengkapnya</button>
+                        <button class="btn-sm primary" onclick="openModal(${JSON.stringify(esc(b.question || '')).slice(1,-1)}, ${JSON.stringify(esc(b.answer || '')).slice(1,-1)})">+ Tambah ke KB</button>
+                        <span class="ba-time">${timeAgo(b.created_at)}</span>
+                    </div>
+                </div>`).join('');
+        }
+
+        // Top questions
+        const tqList = document.getElementById('topQuestionsList');
+        if (!top_questions.length) {
+            tqList.innerHTML = '<div class="empty-state">Belum ada data.</div>';
+        } else {
+            tqList.innerHTML = `<div>${top_questions.map(q => `
+                <div class="tq-row">
+                    <span class="tq-count">${q.count}×</span>
+                    <span class="tq-text">${esc(q.content)}</span>
+                    <button class="btn-ask" onclick="openModal(${JSON.stringify(esc(q.content)).slice(1,-1)}, '')">+ KB</button>
+                </div>`).join('')}</div>`;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function toggleExpand(id, btn) {
+    const el = document.getElementById(id);
+    el.classList.toggle('expanded');
+    btn.textContent = el.classList.contains('expanded') ? 'Sembunyikan' : 'Lihat selengkapnya';
+}
+
+function openModal(question, answer) {
+    document.getElementById('kbTitle').value = question ? 'Cara ' + question.slice(0, 60) : '';
+    document.getElementById('kbContent').value = answer || '';
+    document.getElementById('kbModal').classList.add('open');
+    document.getElementById('kbTitle').focus();
+}
+
+function closeModal() {
+    document.getElementById('kbModal').classList.remove('open');
+}
+
+async function saveToKb() {
+    const title    = document.getElementById('kbTitle').value.trim();
+    const category = document.getElementById('kbCategory').value;
+    const content  = document.getElementById('kbContent').value.trim();
+    if (!title || !content) return alert('Judul dan isi wajib diisi.');
+
+    try {
+        const res = await fetch('/api/admin/chat/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, category, content }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        closeModal();
+        alert('✅ Berhasil ditambahkan ke Knowledge Base!');
+    } catch (e) {
+        alert('❌ ' + e.message);
+    }
+}
+
+document.getElementById('kbModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+});
+
+loadData();
+</script>
+</body>
+</html>

@@ -1,276 +1,380 @@
-# Demo Dashboard OTA Server
+# UTIL Mertani — OTA Server
 
-Firmware management backend for IoT microcontrollers. Handles binary uploads, SHA-256 integrity verification, device polling, and versioned update delivery — with Cloudflare Tunnels for public HTTPS access without port forwarding.
-
----
-
-## Web Interface
-
-### Admin Login
-
-![STM32 OTA Console login page](docs/images/login.png)
-
-### Dashboard
-
-![OTA Server Hub dashboard](docs/images/dashboard.png)
+Server manajemen IoT untuk perangkat Mertani Datalogger. Menyediakan OTA firmware update, serial monitoring, Modbus terminal, dan asisten AI berbasis RAG.
 
 ---
 
-## Features
+## Daftar Isi
 
-- Upload Firmware (.bin): Dilengkapi validasi ekstensi file dan penyimpanan aman menggunakan multer.
-- SHA-256 Checksum Generator: Otomatis menghasilkan kode hash kriptografi untuk validasi integritas firmware di mikrokontroler.
-- Database PostgreSQL: Menyimpan metadata rilis firmware (version, hardware_target, checksum, file_size, release_notes) dan pelacakan perangkat.
-- OTA Polling & Download Endpoint: Endpoint khusus bagi perangkat IoT untuk mengecek pembaruan dan mengunduh file biner.
-- Live Serial Monitor: Menampilkan log dari masing-masing device secara langsung, lengkap dengan filter device, level, pencarian, jeda, dan pembersihan buffer.
-
----
-
-## Prerequisites
-
-Pastikan perangkat Anda telah terinstal perangkat lunak berikut:
-
-1. Node.js
-2. Docker & Docker Compose
+1. [Cara Kerja](#cara-kerja)
+2. [Arsitektur & Struktur Direktori](#arsitektur--struktur-direktori)
+3. [Alur Fitur Utama](#alur-fitur-utama)
+4. [Struktur Database](#struktur-database)
+5. [Keamanan](#keamanan)
+6. [Konfigurasi (.env)](#konfigurasi-env)
+7. [Menjalankan Server](#menjalankan-server)
+8. [Dependensi](#dependensi)
 
 ---
 
-## Project Structure
+## Cara Kerja
+
+Server ini bertindak sebagai **pusat kontrol** untuk perangkat IoT Mertani. Ada dua jenis klien yang terhubung:
 
 ```
-dstx-demo-dashboard-ota-server/
+Perangkat IoT (ESP32/STM32)          Dashboard Admin (Browser)
+        │                                       │
+        │  GET /api/ota/check-update            │  HTTPS (cookie session)
+        │  GET /api/ota/download/:id            │
+        │  POST /api/ota/ack                    │
+        │  POST /api/serial/logs                │  GET /api/admin/...
+        │  GET /api/device/modbus/command       │  POST /api/admin/...
+        └──────────────────────────────────────►│
+                                        [Express Server]
+                                                │
+                                        [PostgreSQL DB]
+```
+
+- **Perangkat** mengakses endpoint `/api/ota/` dan `/api/serial/` tanpa autentikasi (authenticated lewat `devid`)
+- **Admin** mengakses semua endpoint `/api/admin/` dengan cookie session yang diverifikasi HMAC-SHA256
+- **Halaman HTML** dilindungi middleware `requireAuth`; redirect ke `/login` jika session tidak valid
+
+---
+
+## Arsitektur & Struktur Direktori
+
+```
+mertani_ota-server/
+├── server.js                    # Entry point, registrasi route & middleware
+├── .env                         # Konfigurasi rahasia (tidak di-commit)
+│
+├── public/                      # Static HTML (dilindungi requireAuth)
+│   ├── login.html               # Halaman login
+│   ├── index.html               # Dashboard OTA
+│   ├── monitor.html             # Serial Monitor
+│   ├── modbus.html              # Modbus Terminal
+│   └── chat.html                # Asisten AI
+│
 ├── src/
-│   ├── controllers/
-│   │   ├── admin_controller.js
-│   │   ├── ota_controller.js
-│   │   └── serial_controller.js
-│   ├── database/
-│   │   ├── db.js
-│   │   └── init.js
+│   ├── controllers/             # Logika bisnis per fitur
+│   │   ├── admin_controller.js       # CRUD firmware, daftar device
+│   │   ├── ota_controller.js         # check-update, download, ack
+│   │   ├── serial_controller.js      # Simpan & query log serial
+│   │   ├── modbus_controller.js      # Antre & poll perintah Modbus
+│   │   ├── serial_port_controller.js # Buka/tutup serial port lokal
+│   │   ├── chat_controller.js        # Streaming AI + session chat
+│   │   └── knowledge_file_controller.js  # Upload file KB + RAG search
+│   │
 │   ├── middlewares/
-│   │   ├── serial_token.js
-│   │   └── upload.js
-│   ├── routes/
-│   │   ├── admin_routes.js
-│   │   ├── ota_routes.js
-│   │   └── serial_routes.js
-│   ├── services/
-│   │   └── serial_monitor.js
+│   │   ├── auth.js              # Session cookie (HMAC-SHA256, HttpOnly)
+│   │   ├── upload.js            # Multer untuk firmware .bin
+│   │   └── serial_token.js      # Validasi token perangkat serial
+│   │
+│   ├── routes/                  # Definisi endpoint per modul
+│   ├── services/                # Service serial port & monitor
+│   ├── database/
+│   │   ├── db.js                # Pool koneksi PostgreSQL
+│   │   └── init.js              # Inisialisasi/migrasi tabel
 │   └── utils/
-│       └── hash_helper.js
-├── storage/
-│   └── firmwares/       # Physical .bin file storage
-├── .env
-├── docker-compose.yml
-├── package.json
-├── server.js
-└── README.md
+│       └── hash_helper.js       # Hashing checksum firmware
+│
+├── storage/firmwares/           # File .bin firmware yang diupload
+└── uploads/knowledge/           # File dokumen Knowledge Base
 ```
 
 ---
 
-## Database Schema
+## Alur Fitur Utama
 
-Two tables store firmware metadata and device state.
+### 1. OTA Firmware Update
+
+```
+Device                          Server                        Admin
+  │                                │                            │
+  │── GET /check-update ──────────►│                            │
+  │   (devid, hardware, version)   │◄── POST /upload firmware ──│
+  │                                │    (.bin, versi, target)   │
+  │◄── { update_available, url } ──│                            │
+  │                                │                            │
+  │── GET /download/:id ──────────►│                            │
+  │◄── [binary stream .bin] ───────│                            │
+  │                                │                            │
+  │── POST /ack ───────────────────►│                           │
+  │   (devid, firmware_id, status) │                            │
+```
+
+- Server menyimpan file `.bin` di `storage/firmwares/`
+- Checksum SHA-256 dihitung saat upload dan disimpan di DB
+- Device mengirim ACK setelah download berhasil/gagal
+
+### 2. Asisten AI + RAG (Retrieval-Augmented Generation)
+
+```
+User mengetik pertanyaan
+         │
+         ▼
+[Ekstrak keyword] ── filter stopword Indonesia/Inggris
+         │
+         ▼
+[ILIKE search per keyword] ── OR query ke kolom extracted_text
+         │
+    Ada hasil?
+    ┌─────┴─────┐
+   YA          TIDAK
+    │             │
+    ▼             ▼
+[Sliding window]   AI jawab dari
+[skor per chunk]   pengetahuan umum
+[skip 8% header]
+    │
+    ▼
+[Inject ke system prompt]
+    │
+    ▼
+[DeepSeek API — SSE streaming]
+    │
+    ▼
+[Tampilkan ke user real-time]
+```
+
+**Sliding window excerpt:** teks dokumen dipotong per 600 karakter (stride 300), setiap chunk diberi skor berdasarkan jumlah keyword yang cocok. Chunk dengan skor tertinggi di luar 8% pertama dokumen (menghindari header) dipilih sebagai kutipan konteks.
+
+### 3. Knowledge Base File Upload
+
+```
+Upload file (PDF/DOCX/XLSX/PPTX/TXT/CSV/MD)
+         │
+         ▼
+[Cek duplikat] ── original_name sudah ada? ── SKIP (409)
+         │
+         ▼
+[Ekstrak teks]
+  pdf-parse / mammoth / xlsx / jszip / fs.readFile
+         │
+         ▼
+[Simpan ke DB] ── extracted_text + tsvector (GIN index)
+```
+
+### 4. Session Chat
+
+- Setiap kali halaman dimuat, **session key baru** dibuat (`sess_<timestamp><random>`)
+- Chat lama tersimpan di DB dan tampil di sidebar "Riwayat Chat"
+- Klik riwayat → load ulang pesan dari DB, session key diganti ke yang lama
+
+---
+
+## Struktur Database
 
 ### `firmwares`
-
-```sql
-CREATE TABLE IF NOT EXISTS firmwares (
-    id SERIAL PRIMARY KEY,
-    version VARCHAR(50) NOT NULL,
-    hardware_target VARCHAR(100) NOT NULL,
-    file_path VARCHAR(255) NOT NULL,
-    file_size INTEGER NOT NULL,
-    checksum VARCHAR(255) NOT NULL,
-    release_notes TEXT,
-    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `version` | VARCHAR(50) | Versi firmware, misal `1.2.3` |
+| `hardware_target` | VARCHAR(100) | Target hardware, misal `MTI-THETA` |
+| `file_path` | VARCHAR(255) | Path file `.bin` di server |
+| `file_size` | INTEGER | Ukuran file dalam bytes |
+| `checksum` | VARCHAR(255) | SHA-256 file |
+| `release_notes` | TEXT | Catatan rilis |
+| `upload_date` | TIMESTAMP | |
 
 ### `devices`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `mac_address` | VARCHAR(50) PK | |
+| `current_version` | VARCHAR(50) | Versi firmware aktif |
+| `last_seen` | TIMESTAMP | |
 
-```sql
-CREATE TABLE IF NOT EXISTS devices (
-    mac_address VARCHAR(50) PRIMARY KEY,
-    current_version VARCHAR(50),
-    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+### `ota_devices`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `devid` | VARCHAR(20) PK | ID unik perangkat |
+| `created_at` | TIMESTAMP | |
+| `last_seen` | TIMESTAMP | Di-update setiap check-update |
 
-Relationship: devices poll `firmwares` for a newer version than `current_version`. A device is identified by its MAC address.
+### `firmware_targets`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `firmware_id` | INTEGER FK → firmwares | |
+| `devid` | VARCHAR(20) | Perangkat yang ditarget |
+
+Composite PK `(firmware_id, devid)`.
+
+### `ota_download_acks`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `devid` | VARCHAR(20) | |
+| `firmware_id` | INTEGER FK → firmwares | |
+| `download_status` | BOOLEAN | `true` = sukses |
+| `acknowledged_at` | TIMESTAMP | |
+
+Unique index `(devid, firmware_id)` — satu ACK per pasangan.
+
+### `modbus_commands`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `devid` | VARCHAR(20) | Target perangkat |
+| `frame` | VARCHAR(200) | Frame hex Modbus RTU |
+| `description` | VARCHAR(255) | Label perintah |
+| `status` | VARCHAR(20) | `pending` / `sent` / `responded` |
+| `created_at` | TIMESTAMP | |
+| `sent_at` | TIMESTAMP | Waktu dikirim ke device |
+| `response_frame` | VARCHAR(200) | Respons dari device |
+| `response_status` | VARCHAR(20) | |
+| `responded_at` | TIMESTAMP | |
+
+### `chat_sessions`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `session_key` | VARCHAR(64) UNIQUE | Key random per sesi |
+| `created_at` | TIMESTAMP | |
+| `updated_at` | TIMESTAMP | Di-update tiap pesan baru |
+
+### `chat_messages`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | BIGSERIAL PK | |
+| `session_id` | BIGINT FK → chat_sessions | CASCADE DELETE |
+| `role` | VARCHAR(20) | `user` atau `assistant` |
+| `content` | TEXT | Isi pesan |
+| `created_at` | TIMESTAMP | |
+
+Index: `(session_id, id)` untuk query history cepat.
+
+### `knowledge_base`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `title` | VARCHAR(200) | |
+| `category` | VARCHAR(100) | Default `'Umum'` |
+| `content` | TEXT | Isi knowledge |
+| `created_at` | TIMESTAMP | |
+| `updated_at` | TIMESTAMP | |
+
+### `knowledge_files`
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `original_name` | VARCHAR(255) | Nama file asli (cek duplikat) |
+| `file_type` | VARCHAR(20) | Ekstensi: `pdf`, `docx`, dll |
+| `file_size` | INTEGER | Bytes |
+| `file_path` | VARCHAR(500) | Path fisik di server |
+| `extracted_text` | TEXT | Teks hasil ekstraksi |
+| `text_search` | TSVECTOR | GIN index untuk FTS |
+| `created_at` | TIMESTAMP | |
 
 ---
 
-## Installation
+## Keamanan
 
-### 1. Install dependencies
+### Autentikasi Admin
 
-```bash
-npm install express multer dotenv pg
-npm install --save-dev nodemon
-```
+| Mekanisme | Detail |
+|---|---|
+| **Session cookie** | HMAC-SHA256 dengan `SESSION_SECRET` dari `.env` |
+| **Cookie flags** | `HttpOnly`, `SameSite=Strict`, `Secure` (di production) |
+| **TTL session** | 8 jam, kadaluarsa otomatis |
+| **Timing-safe compare** | `crypto.timingSafeEqual` untuk username & password — mencegah timing attack |
+| **Cache-Control** | `no-store` pada semua halaman HTML — cegah cache browser |
 
-### 2. Configure environment
+### Proteksi Endpoint
 
-Create `.env` in the project root:
+- Semua `/api/admin/*` dan halaman HTML dilindungi `requireAuth` middleware
+- Endpoint perangkat (`/api/ota/*`, `/api/serial/*`) tidak butuh session admin — diakses device dengan `devid`
+- `devid` divalidasi regex `^[A-Za-z0-9._:-]{1,20}$` sebelum masuk ke query
+
+### Upload File
+
+| Aspek | Implementasi |
+|---|---|
+| **Firmware** | Hanya `.bin`, disimpan dengan nama random (`stm32-<timestamp>.bin`) |
+| **Knowledge file** | Whitelist ekstensi: `.pdf .docx .xlsx .xls .pptx .txt .md .csv` |
+| **Batas ukuran** | 20 MB per file (multer `limits.fileSize`) |
+| **Duplikat** | Cek `original_name` di DB sebelum proses — file duplikat langsung dihapus |
+| **Path traversal** | `multer.diskStorage` mengontrol nama file; path tidak berasal dari input user |
+
+### Database
+
+- Semua query menggunakan **parameterized query** (`$1, $2, ...`) — tidak ada string interpolation SQL
+- Koneksi pool via `pg` dengan kredensial dari `.env`
+
+### Hal yang Perlu Diperhatikan
+
+> ⚠️ **Single-user:** sistem ini dirancang untuk satu admin. Tidak ada manajemen multi-user atau role.
+>
+> ⚠️ **HTTPS:** pastikan server diakses via HTTPS (misal Cloudflare Tunnel) di production agar cookie `Secure` aktif dan token tidak dikirim plaintext.
+>
+> ⚠️ **Disk penuh:** sisa disk saat ini ~9 GB (90% terpakai). Monitor penggunaan disk secara berkala.
+
+---
+
+## Konfigurasi (.env)
 
 ```env
+# Server
 PORT=3100
+NODE_ENV=production          # aktifkan Secure cookie
+
+# Database PostgreSQL
 DB_HOST=localhost
-DB_PORT=5433
-DB_USER=example_admin
-DB_PASSWORD=example_supersecret
-DB_NAME=example_database
+DB_PORT=5432
+DB_USER=ota_admin
+DB_PASSWORD=your_db_password
+DB_NAME=ota_database
+
+# Autentikasi Admin
 ADMIN_USERNAME=admin_mertani
-ADMIN_PASSWORD=change_this_password
-SESSION_SECRET=generate_a_long_random_value
-SERIAL_INGEST_TOKEN=generate_a_device_token
-SERIAL_LOG_LIMIT=1000
+ADMIN_PASSWORD=your_admin_password
+SESSION_SECRET=random_string_panjang_64_karakter
+
+# DeepSeek AI
+DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
 
-### 3. Start PostgreSQL
-
+Generate `SESSION_SECRET`:
 ```bash
-docker compose up -d
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-### 4. Initialize database tables
+---
 
+## Menjalankan Server
+
+### Inisialisasi database (pertama kali)
 ```bash
 node src/database/init.js
 ```
 
-### 5. Start the server
-
+### Development
 ```bash
-npx nodemon server.js
+npm run dev        # nodemon, auto-restart saat ada perubahan
 ```
 
-Server runs at `http://localhost:3100`.
-
----
-
-## API Reference
-
-### Admin — Firmware Management
-
-**Upload firmware**
-
-```
-POST /api/admin/upload
-Content-Type: multipart/form-data
-
-### B. OTA API (Untuk Perangkat IoT / STM32)
-
-#### Cek Ketersediaan Update
-
-- Method: `GET`
-- URL: `/api/ota/check?devid=1734567890`
-- Query wajib: `devid` berupa UNIX ID unik milik device
-- Query opsional: `hardware_target` dan `current_version`
-- Respons:
-
-```json
-{
-  "devid": "1734567890",
-  "update_id": "1",
-  "update_available": true,
-  "version": "v2.0.3"
-}
-```
-
-Jika `current_version` diberikan, `update_available` bernilai `false` ketika versinya sama dengan rilis terbaru. Server hanya memilih firmware yang ditargetkan ke `devid` tersebut atau firmware dengan target `*`.
-
-Setelah server menerima ACK dengan `download_status: true`, pemanggilan check berikutnya mengembalikan `update_available: false` hanya untuk `devid` tersebut. Device lain tetap memiliki statusnya sendiri.
-
-#### Kirim ACK Setelah Download
-
-- Method: `POST`
-- URL: `/api/ota/ack`
-- Header: `Content-Type: application/json`
-- Body:
-
-```json
-{
-  "devid": "1734567890",
-  "update_id": "1",
-  "download_status": true
-}
-```
-
-Nilai `download_status` wajib berupa boolean JSON (`true` atau `false`), bukan string.
-
-#### Unduh Firmware Terbaru
-
-- Method: `GET`
-- URL: `/api/ota/download/latest?devid=1734567890`
-- Query wajib: `devid`
-- Query opsional: `hardware_target`
-- Deskripsi: Mengunduh file `.bin` asli hasil compile yang ditargetkan ke device tersebut. Server tidak menambahkan header atau mengubah isi binary.
-
-Saat upload dari dashboard, kolom **Target Device ID** menerima satu atau beberapa `devid` yang dipisahkan koma. Gunakan target `*` hanya bila firmware memang harus tersedia untuk seluruh device.
-
-### Serial Monitor
-
-Halaman monitor tersedia di `http://localhost:3100/monitor` dan dilindungi oleh login admin.
-
-Device mengirim satu log menggunakan endpoint berikut:
-
-```http
-POST /api/serial/logs
-Content-Type: application/json
-X-Device-Token: <nilai SERIAL_INGEST_TOKEN dari .env>
-```
-
-```json
-{
-  "devid": "MTI-0001",
-  "level": "info",
-  "message": "Boot selesai, sensor siap"
-}
-```
-
-Nilai `level` yang diterima adalah `debug`, `info`, `warn`, dan `error`. Server menyimpan maksimal `SERIAL_LOG_LIMIT` entri di memori. Buffer log akan kosong ketika proses Node.js dimulai ulang.
-
-Untuk memutar file log secara otomatis dan terus-menerus ke halaman Serial Monitor:
-
+### Production
 ```bash
-npm run serial:replay
+npm start          # node server.js
 ```
 
-Sumber file, `devid`, interval pengiriman, dan mode pengulangan dapat diatur melalui `SERIAL_LOG_FILE`, `SERIAL_LOG_DEVID`, `SERIAL_REPLAY_DELAY_MS`, serta `SERIAL_REPLAY_LOOP` di `.env`. Tekan `Ctrl+C` untuk menghentikannya. Nilai yang tampak seperti password, token, atau Bluetooth key disamarkan sebelum dikirim.
+### Akses
+Buka `http://localhost:3100` (atau port sesuai `.env`) → redirect ke halaman login.
 
 ---
 
-## Public Deployment (Cloudflare Tunnel)
+## Dependensi
 
-To make the server reachable from IoT devices outside the local network:
+| Package | Versi | Fungsi |
+|---|---|---|
+| `express` | ^5.2 | HTTP framework |
+| `pg` | ^8.23 | PostgreSQL client |
+| `multer` | ^2.4 | Upload file multipart |
+| `pdf-parse` | 1.1.1 | Ekstraksi teks PDF |
+| `mammoth` | ^1.13 | Ekstraksi teks DOCX |
+| `xlsx` | ^0.18 | Ekstraksi teks XLSX/XLS/CSV |
+| `jszip` | ^3.10 | Ekstraksi teks PPTX (XML) |
+| `serialport` | ^13.0 | Komunikasi serial port lokal |
+| `dotenv` | ^18.0 | Load variabel dari `.env` |
+| `nodemon` | ^3.1 | Dev: auto-restart (devDependency) |
 
-```bash
-cloudflared tunnel run --url http://localhost:3000 <YOUR_TUNNEL_NAME>
-```
-
-Use the resulting HTTPS URL in your microcontroller firmware.
-
----
-
-## .gitignore
-
-```gitignore
-node_modules/
-.env
-storage/firmwares/*
-!storage/firmwares/.gitkeep
-.DS_Store
-```
-
----
-
-## Tech Stack
-
-Node.js · Express · PostgreSQL · Docker Compose · Cloudflare Tunnels
-
-## License
-
-MIT
+> **Catatan `pdf-parse`:** gunakan versi `1.1.1` spesifik. Versi 2.x menggunakan API class-based yang tidak kompatibel.

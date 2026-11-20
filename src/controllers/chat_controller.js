@@ -56,13 +56,14 @@ async function getOrCreateSession(sessionKey) {
 }
 
 async function saveMessage(sessionId, role, content) {
-    await pool.query(
-        `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+    const result = await pool.query(
+        `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3) RETURNING id`,
         [sessionId, role, content]
     );
     await pool.query(
         `UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [sessionId]
     );
+    return result.rows[0].id;
 }
 
 // ── POST /stream ────────────────────────────────────────────
@@ -160,11 +161,12 @@ const chatStream = async (req, res) => {
         }
 
         // Save assistant reply
+        let assistantMsgId = null;
         if (sessionId && full) {
-            await saveMessage(sessionId, 'assistant', full);
+            assistantMsgId = await saveMessage(sessionId, 'assistant', full);
         }
 
-        res.write('event: done\ndata: {}\n\n');
+        res.write(`event: done\ndata: ${JSON.stringify({ message_id: assistantMsgId })}\n\n`);
         res.end();
     } catch (err) {
         console.error('[Chat] error:', err.message);
@@ -287,7 +289,70 @@ const deleteKnowledge = async (req, res) => {
     }
 };
 
+// ── Feedback (thumbs up/down) ───────────────────────────────
+
+const submitFeedback = async (req, res) => {
+    const { message_id, rating } = req.body;
+    if (!message_id || ![-1, 1].includes(Number(rating)))
+        return res.status(400).json({ error: 'message_id dan rating (1 atau -1) wajib diisi' });
+    try {
+        await pool.query(
+            `INSERT INTO chat_feedback (message_id, rating) VALUES ($1, $2)
+             ON CONFLICT (message_id) DO UPDATE SET rating = EXCLUDED.rating`,
+            [message_id, Number(rating)]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ── Review dashboard data ───────────────────────────────────
+
+const getReviewData = async (req, res) => {
+    try {
+        const [stats, badAnswers, topQuestions] = await Promise.all([
+            pool.query(`
+                SELECT
+                    COUNT(*) FILTER (WHERE rating =  1) AS thumbs_up,
+                    COUNT(*) FILTER (WHERE rating = -1) AS thumbs_down,
+                    (SELECT COUNT(*) FROM chat_messages WHERE role = 'user') AS total_questions
+                FROM chat_feedback
+            `),
+            pool.query(`
+                SELECT cf.message_id, cf.created_at,
+                       cm.content AS answer,
+                       (SELECT content FROM chat_messages
+                        WHERE session_id = cm.session_id AND id < cm.id AND role = 'user'
+                        ORDER BY id DESC LIMIT 1) AS question
+                FROM chat_feedback cf
+                JOIN chat_messages cm ON cm.id = cf.message_id
+                WHERE cf.rating = -1
+                ORDER BY cf.created_at DESC
+                LIMIT 30
+            `),
+            pool.query(`
+                SELECT content, COUNT(*) AS count
+                FROM chat_messages
+                WHERE role = 'user' AND length(content) > 8
+                GROUP BY content
+                ORDER BY count DESC
+                LIMIT 25
+            `),
+        ]);
+        res.json({
+            success: true,
+            stats: stats.rows[0],
+            bad_answers: badAnswers.rows,
+            top_questions: topQuestions.rows,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 module.exports = {
     chatStream, getHistory, getSessions, deleteSession,
     listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge,
+    submitFeedback, getReviewData,
 };

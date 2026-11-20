@@ -4,9 +4,10 @@ const multer = require('multer');
 const {
     chatStream, getHistory, getSessions, deleteSession,
     listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge,
+    submitFeedback, getReviewData,
 } = require('../controllers/chat_controller');
 const {
-    uploadKnowledgeFile, listKnowledgeFiles, deleteKnowledgeFile,
+    uploadKnowledgeFile, listKnowledgeFiles, deleteKnowledgeFile, reextractFile,
 } = require('../controllers/knowledge_file_controller');
 
 const router = express.Router();
@@ -38,8 +39,12 @@ router.post('/knowledge',        createKnowledge);
 router.put('/knowledge/:id',     updateKnowledge);
 router.delete('/knowledge/:id',  deleteKnowledge);
 
-router.get('/knowledge-files',              listKnowledgeFiles);
+router.get('/knowledge-files',                listKnowledgeFiles);
 router.post('/knowledge-files', kfUpload.single('file'), uploadKnowledgeFile);
-router.delete('/knowledge-files/:id',       deleteKnowledgeFile);
+router.delete('/knowledge-files/:id',         deleteKnowledgeFile);
+router.post('/knowledge-files/:id/reextract', reextractFile);
+
+router.post('/feedback',  submitFeedback);
+router.get('/review',     getReviewData);
 
 module.exports = router;
