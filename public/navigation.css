@@ -6,12 +6,12 @@ body { padding-bottom: 112px !important; }
     bottom: 22px;
     z-index: 1000;
     display: flex;
-    gap: 10px;
-    padding: 9px 12px;
-    border: 1px solid rgba(203, 213, 225, 0.9);
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.78);
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid rgba(213, 218, 226, .9);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, .86);
+    box-shadow: 0 16px 42px rgba(15, 23, 42, .16), inset 0 1px 0 rgba(255, 255, 255, .95);
     backdrop-filter: blur(18px) saturate(145%);
     -webkit-backdrop-filter: blur(18px) saturate(145%);
     transform: translateX(-50%);
@@ -21,30 +21,30 @@ body { padding-bottom: 112px !important; }
     position: relative;
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
-    color: #475569;
-    background: rgba(241, 245, 249, 0.94);
-    border: 1px solid rgba(226, 232, 240, 0.95);
+    width: 50px;
+    height: 50px;
+    border-radius: 15px;
+    color: #526071;
+    background: rgba(247, 248, 250, .96);
+    border: 1px solid rgba(226, 232, 240, .96);
     text-decoration: none;
     transition: transform 160ms ease, color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
-.dock-item svg { width: 23px; height: 23px; }
+.dock-item svg { width: 22px; height: 22px; stroke-linecap: round; stroke-linejoin: round; }
 
 .dock-item:hover {
-    color: #c2410c;
-    background: #fff7ed;
-    box-shadow: 0 9px 18px rgba(234, 88, 12, 0.16);
-    transform: translateY(-7px) scale(1.06);
+    color: #c94712;
+    background: #fff5ef;
+    box-shadow: 0 10px 22px rgba(232, 93, 31, .16);
+    transform: translateY(-6px) scale(1.05);
 }
 
 .dock-item.active {
     color: #fff;
-    background: linear-gradient(145deg, #fb923c, #ea580c);
-    border-color: #ea580c;
-    box-shadow: 0 9px 20px rgba(234, 88, 12, 0.28);
+    background: linear-gradient(145deg, #f47a42, #e85d1f);
+    border-color: #e85d1f;
+    box-shadow: 0 9px 22px rgba(232, 93, 31, .3);
 }
 
 .dock-item.active::after {
@@ -54,7 +54,7 @@ body { padding-bottom: 112px !important; }
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #ea580c;
+    background: #e85d1f;
 }
 
 .dock-label {
@@ -62,9 +62,9 @@ body { padding-bottom: 112px !important; }
     bottom: calc(100% + 11px);
     left: 50%;
     padding: 5px 8px;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #fff;
-    background: #0f172a;
+    background: #172033;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;

@@ -1,5 +1,4 @@
 const pool = require('../database/db');
-const { packageFirmware } = require('../utils/mti_packager');
 const path = require('path');
 const fs = require('fs');
 
@@ -49,53 +48,9 @@ function normalizeDevid(value) {
     return /^[A-Za-z0-9._:-]{1,20}$/.test(devid) ? devid : null;
 }
 
-/**
- * Ensures a firmware record has a valid .mti package file.
- * For records uploaded before packaging was introduced, generates the package
- * on-the-fly from the stored .bin and persists the result to DB.
- * Returns the absolute path to the .mti file, or null on failure.
- */
-async function ensureMtiPackage(row) {
-    // Happy path: mti already exists
-    if (row.mti_file_path) {
-        const abs = path.resolve(row.mti_file_path);
-        if (fs.existsSync(abs)) return abs;
-    }
-
-    // Retroactive packaging from .bin
-    const binAbs = path.resolve(row.file_path);
-    if (!fs.existsSync(binAbs)) return null;
-
-    let pkgResult;
-    try {
-        pkgResult = packageFirmware(fs.readFileSync(binAbs));
-    } catch (e) {
-        console.error(`[OTA] retroactive packaging failed for id=${row.id}:`, e.message);
-        return null;
-    }
-
-    const mtiPath = binAbs.replace(/\.bin$/, '.mti');
-    fs.writeFileSync(mtiPath, pkgResult.mtiBuffer);
-
-    // Persist to DB so the next request doesn't need to repackage
-    try {
-        await pool.query(
-            `UPDATE firmwares
-             SET mti_file_path = $1, mti_file_size = $2, payload_crc32 = $3
-             WHERE id = $4`,
-            [
-                path.relative(process.cwd(), mtiPath),
-                pkgResult.totalSize,
-                pkgResult.payloadCrc32.toString(16).toUpperCase().padStart(8, '0'),
-                row.id,
-            ]
-        );
-        console.log(`[OTA] retroactive package saved for firmware id=${row.id}`);
-    } catch (dbErr) {
-        console.error(`[OTA] DB update failed for id=${row.id}:`, dbErr.message);
-    }
-
-    return mtiPath;
+function getFirmwareBinPath(row) {
+    const binPath = path.resolve(row.file_path);
+    return fs.existsSync(binPath) ? binPath : null;
 }
 
 const checkUpdate = async (req, res) => {
@@ -212,7 +167,7 @@ const downloadFirmware = async (req, res) => {
 
     try {
         const query = `
-            SELECT id, file_path, mti_file_path, version
+            SELECT id, file_path, version
             FROM firmwares WHERE id = $1
         `;
         const result = await pool.query(query, [firmwareId]);
@@ -222,16 +177,16 @@ const downloadFirmware = async (req, res) => {
         }
 
         const row = result.rows[0];
-        const mtiAbs = await ensureMtiPackage(row);
+        const binPath = getFirmwareBinPath(row);
 
-        if (!mtiAbs) {
-            return res.status(500).json({
-                error: 'File UPDATE.MTI tidak tersedia dan tidak dapat dibuat ulang dari binary yang tersimpan',
+        if (!binPath) {
+            return res.status(404).json({
+                error: 'File firmware .bin tidak tersedia di penyimpanan server',
             });
         }
 
         res.setHeader('Content-Type', 'application/octet-stream');
-        res.download(mtiAbs, 'UPDATE.MTI');
+        res.download(binPath, 'UPDATE.bin');
     } catch (error) {
         console.error('Error saat unduh firmware:', error);
         res.status(500).json({ error: 'Terjadi kesalahan pada server' });
@@ -249,7 +204,7 @@ const downloadLatest = async (req, res) => {
     try {
         await ensureOtaSchema();
         const result = await pool.query(
-            `SELECT f.id, f.file_path, f.mti_file_path, f.version
+            `SELECT f.id, f.file_path, f.version
              FROM firmwares f
              WHERE EXISTS (
                        SELECT 1 FROM firmware_targets t
@@ -270,16 +225,16 @@ const downloadLatest = async (req, res) => {
         }
 
         const row = result.rows[0];
-        const mtiAbs = await ensureMtiPackage(row);
+        const binPath = getFirmwareBinPath(row);
 
-        if (!mtiAbs) {
-            return res.status(500).json({
-                error: 'File UPDATE.MTI tidak tersedia dan tidak dapat dibuat ulang dari binary yang tersimpan',
+        if (!binPath) {
+            return res.status(404).json({
+                error: 'File firmware .bin tidak tersedia di penyimpanan server',
             });
         }
 
         res.setHeader('Content-Type', 'application/octet-stream');
-        res.download(mtiAbs, 'UPDATE.MTI');
+        res.download(binPath, 'UPDATE.bin');
     } catch (error) {
         console.error('Error saat unduh firmware terbaru:', error);
         res.status(500).json({ error: 'Terjadi kesalahan pada server' });

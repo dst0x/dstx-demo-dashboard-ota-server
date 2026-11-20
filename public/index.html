@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTA Mertani</title>
+    <title>UTIL Mertani</title>
     <link rel="stylesheet" href="/navigation.css">
     <style>
         :root {
@@ -230,11 +230,12 @@
             .btn-delete { align-self: flex-end; }
         }
     </style>
+    <link rel="stylesheet" href="/app-theme.css">
 </head>
 <body>
 
 <header>
-    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">OTA <span>Mertani</span></h1>
+    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">UTIL <span>Mertani</span></h1>
     <div class="header-actions">
         <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">MTI2</span>
         <form action="/api/auth/logout" method="post">
@@ -247,8 +248,8 @@
 
     <div class="info-box">
         <strong>Alur Otomatis</strong>
-        Upload file Release <code>.bin</code> dari STM32CubeIDE → Server memvalidasi binary dan membuat paket
-        <code>UPDATE.MTI</code> secara otomatis → Device mendownload file siap pakai.
+        Upload file Release <code>.bin</code> dari STM32CubeIDE → Server menghitung checksum SHA-256 →
+        Device mendownload file <code>.bin</code> asli hasil compile.
     </div>
 
     <!-- Upload Form -->
@@ -294,7 +295,8 @@
             </div>
 
             <button type="submit" class="btn-primary" id="submitBtn">
-                SEND
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M5 19h14"/></svg>
+                Unggah &amp; siapkan firmware
             </button>
         </form>
         <div id="responseMessage"></div>
@@ -329,7 +331,10 @@
     <a class="dock-item" href="/modbus" aria-label="Modbus Terminal">
         <span class="dock-label">Modbus Terminal</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
+            <rect x="2" y="5" width="6" height="14" rx="2"/>
+            <rect x="16" y="5" width="6" height="14" rx="2"/>
+            <path d="M8 9h8m-3-3 3 3-3 3M16 15H8m3-3-3 3 3 3"/>
+            <path d="M4.5 8h1M18.5 16h1"/>
         </svg>
     </a>
 </nav>
@@ -355,16 +360,11 @@
                 container.innerHTML = '';
                 result.data.forEach(fw => {
                     const date      = new Date(fw.upload_date).toLocaleString('id-ID');
-                    const mtiSize   = fw.mti_file_size ? `${(fw.mti_file_size / 1024).toFixed(1)} KB` : '-';
                     const binSize   = `${(fw.file_size / 1024).toFixed(1)} KB`;
                     const targets   = Array.isArray(fw.target_devids) && fw.target_devids.length
                         ? fw.target_devids.join(', ')
                         : 'Belum ditargetkan';
-                    const crc32str  = fw.payload_crc32 ? fw.payload_crc32 : '-';
                     const sha256str = fw.checksum ? fw.checksum.substring(0, 16) + '…' : '-';
-                    const mtiReady  = fw.mti_file_path
-                        ? `<span class="badge-mti">UPDATE.MTI siap</span>`
-                        : `<span style="font-size:11px;color:#991b1b;">MTI tidak tersedia</span>`;
 
                     container.innerHTML += `
                         <div class="firmware-item">
@@ -372,21 +372,19 @@
                                 <h4>
                                     Versi ${fw.version}
                                     <span class="badge">${fw.hardware_target}</span>
-                                    ${mtiReady}
+                                    <span class="badge-mti">.bin siap</span>
                                 </h4>
                                 <p><strong>Catatan:</strong> ${fw.release_notes || 'Tidak ada catatan'}</p>
                                 <p>
-                                    <strong>Payload CRC32:</strong> <code>0x${crc32str}</code> &nbsp;|&nbsp;
-                                    <strong>SHA-256 (MTI):</strong> <code>${sha256str}</code>
+                                    <strong>SHA-256 (.bin):</strong> <code>${sha256str}</code>
                                 </p>
                                 <p>
-                                    <strong>Ukuran .bin:</strong> ${binSize} &nbsp;|&nbsp;
-                                    <strong>Ukuran UPDATE.MTI:</strong> ${mtiSize}
+                                    <strong>Ukuran .bin:</strong> ${binSize}
                                 </p>
                                 <p><strong>Target devid:</strong> <code>${targets}</code></p>
                                 <p style="color: #94a3b8; font-size: 11px; margin-top: 4px;">
                                     Diunggah: ${date} &nbsp;|&nbsp;
-                                    Download: <a href="/api/ota/download/${fw.id}" style="color: var(--primary);">UPDATE.MTI #${fw.id}</a>
+                                    Download: <a href="/api/ota/download/${fw.id}" style="color: var(--primary);">Firmware .bin #${fw.id}</a>
                                 </p>
                             </div>
                             <button class="btn-delete" onclick="deleteFirmware(${fw.id})">Hapus</button>
@@ -402,7 +400,7 @@
     }
 
     async function deleteFirmware(id) {
-        if (!confirm(`Hapus firmware #${id} beserta file UPDATE.MTI-nya?`)) return;
+        if (!confirm(`Hapus firmware .bin #${id}?`)) return;
 
         try {
             const res    = await fetch(`/api/admin/firmware/${id}`, { method: 'DELETE' });
@@ -422,10 +420,10 @@
         e.preventDefault();
 
         submitBtn.disabled    = true;
-        submitBtn.textContent = 'Memproses & packaging…';
+        submitBtn.textContent = 'Memproses firmware .bin…';
         responseMsg.style.display = 'block';
         responseMsg.className     = 'info';
-        responseMsg.textContent   = 'Mengunggah, memvalidasi binary, dan membuat UPDATE.MTI…';
+        responseMsg.textContent   = 'Mengunggah firmware .bin dan menghitung checksum SHA-256…';
 
         try {
             const res    = await fetch('/api/admin/upload', { method: 'POST', body: new FormData(form) });
@@ -436,8 +434,8 @@
                 responseMsg.className   = 'success';
                 responseMsg.innerHTML   =
                     `<strong>Berhasil!</strong> ID: #${d.id} | Versi: ${d.version}<br>` +
-                    `Payload CRC32: <code>0x${d.payload_crc32}</code> | ` +
-                    `UPDATE.MTI: ${(d.mti_file_size / 1024).toFixed(1)} KB`;
+                    `SHA-256: <code>${d.checksum.substring(0, 16)}…</code> | ` +
+                    `Firmware .bin: ${(d.file_size / 1024).toFixed(1)} KB`;
                 form.reset();
                 loadFirmwares();
             } else {
@@ -449,7 +447,7 @@
             responseMsg.textContent = 'Gagal terhubung ke server backend.';
         } finally {
             submitBtn.disabled    = false;
-            submitBtn.textContent = 'Validasi & Package Firmware → UPDATE.MTI';
+            submitBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M5 19h14"/></svg> Unggah &amp; siapkan firmware';
         }
     });
 

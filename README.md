@@ -207,7 +207,7 @@ Nilai `download_status` wajib berupa boolean JSON (`true` atau `false`), bukan s
 - URL: `/api/ota/download/latest?devid=1734567890`
 - Query wajib: `devid`
 - Query opsional: `hardware_target`
-- Deskripsi: Mengunduh paket `UPDATE.MTI` terbaru yang ditargetkan ke device tersebut.
+- Deskripsi: Mengunduh file `.bin` asli hasil compile yang ditargetkan ke device tersebut. Server tidak menambahkan header atau mengubah isi binary.
 
 Saat upload dari dashboard, kolom **Target Device ID** menerima satu atau beberapa `devid` yang dipisahkan koma. Gunakan target `*` hanya bila firmware memang harus tersedia untuk seluruh device.
 

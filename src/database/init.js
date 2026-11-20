@@ -8,18 +8,10 @@ const createTables = async () => {
             hardware_target VARCHAR(100) NOT NULL,
             file_path       VARCHAR(255) NOT NULL,
             file_size       INTEGER      NOT NULL,
-            mti_file_path   VARCHAR(255),
-            mti_file_size   INTEGER,
             checksum        VARCHAR(255) NOT NULL,
-            payload_crc32   VARCHAR(10),
             release_notes   TEXT,
             upload_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-
-        ALTER TABLE firmwares
-            ADD COLUMN IF NOT EXISTS mti_file_path  VARCHAR(255),
-            ADD COLUMN IF NOT EXISTS mti_file_size  INTEGER,
-            ADD COLUMN IF NOT EXISTS payload_crc32  VARCHAR(10);
 
         CREATE TABLE IF NOT EXISTS devices (
             mac_address     VARCHAR(50) PRIMARY KEY,
@@ -49,6 +41,11 @@ const createTables = async () => {
 
         ALTER TABLE ota_download_acks
             ADD COLUMN IF NOT EXISTS devid VARCHAR(20);
+
+        ALTER TABLE firmwares
+            DROP COLUMN IF EXISTS mti_file_path,
+            DROP COLUMN IF EXISTS mti_file_size,
+            DROP COLUMN IF EXISTS payload_crc32;
 
         CREATE INDEX IF NOT EXISTS idx_ota_download_acks_firmware_id
             ON ota_download_acks(firmware_id);

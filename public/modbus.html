@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modbus Terminal · OTA Mertani</title>
+    <title>Modbus Terminal · UTIL Mertani</title>
     <link rel="stylesheet" href="/navigation.css">
     <style>
         :root {
@@ -156,14 +156,15 @@
         .raw-err { color: var(--term-err); }
         .raw-sys { color: var(--term-ts); font-style: italic; }
     </style>
+    <link rel="stylesheet" href="/app-theme.css">
 </head>
 <body>
 
 <header>
-    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">OTA <span>Mertani</span> — Modbus Terminal</h1>
+    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">UTIL <span>Mertani</span> — Modbus Terminal</h1>
     <div class="header-actions">
         <div class="conn-status"><span class="status-dot" id="statusDot"></span><span id="statusText">Menghubungkan...</span></div>
-        <form method="post" action="/api/auth/logout"><button type="submit" class="btn">Logout</button></form>
+        <form method="post" action="/api/auth/logout"><button type="submit" class="btn btn-logout">Keluar</button></form>
     </div>
 </header>
 
@@ -222,7 +223,7 @@
 
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-                    <button class="btn" onclick="buildFrame()">▶ Build Frame</button>
+                    <button class="btn" onclick="buildFrame()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h5M8 16h8"/></svg>Susun frame</button>
                     <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none;">
                         <input type="checkbox" id="includeCrc" checked onchange="buildFrame()"
                                style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
@@ -251,7 +252,7 @@
                 </div>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <button class="btn btn-primary" onclick="sendCommand()">Kirim ke Antrian</button>
+                <button class="btn btn-primary" onclick="sendCommand()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>Kirim ke antrian</button>
                 <span id="sendStatus" style="font-size:12px; color:var(--text-muted);"></span>
             </div>
         </div>
@@ -273,7 +274,7 @@
                     </select>
                 </div>
                 <button class="btn btn-primary" id="btnConnect" onclick="togglePort()">Hubungkan</button>
-                <button class="btn" onclick="refreshPorts()">↻ Refresh Port</button>
+                <button class="btn" onclick="refreshPorts()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg>Perbarui port</button>
                 <div class="port-status disconnected" id="portStatus">
                     <span class="status-dot" id="portDot"></span>
                     <span id="portStatusText">Tidak terhubung</span>
@@ -293,7 +294,7 @@
                     <input id="directTimeout" type="number" value="1000" min="100" max="10000"
                            style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;">
                 </div>
-                <button class="btn btn-primary" onclick="directSend()" style="align-self:flex-end;">Kirim</button>
+                <button class="btn btn-primary" onclick="directSend()" style="align-self:flex-end;"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></svg>Kirim</button>
             </div>
             <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
                 <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none;">
@@ -307,7 +308,7 @@
             <!-- Raw terminal -->
             <div id="rawTerm"><span class="raw-sys">── Terminal serial siap ──</span></div>
             <div style="display:flex;justify-content:flex-end;">
-                <button class="btn btn-sm" onclick="clearRaw()">Hapus</button>
+                <button class="btn btn-sm" onclick="clearRaw()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7"/></svg>Hapus</button>
             </div>
         </div>
 
@@ -325,7 +326,7 @@
                 <select id="histDevid" style="padding:5px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;" onchange="loadHistory()">
                     <option value="">Semua Device</option>
                 </select>
-                <button class="btn btn-sm" onclick="loadHistory()">↻ Refresh</button>
+                <button class="btn btn-sm" onclick="loadHistory()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/></svg>Perbarui</button>
             </div>
         </div>
         <div class="panel-body" style="padding:0;">
@@ -383,7 +384,7 @@
                     <label>Frame Hex</label>
                     <input id="inspectInput" type="text" placeholder="32 06 0F 52 00 03 6E CD" spellcheck="false">
                 </div>
-                <button class="btn btn-primary" onclick="inspectFrame()">Inspect</button>
+                <button class="btn btn-primary" onclick="inspectFrame()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Periksa frame</button>
                 <div class="crc-result" id="inspectResult" style="display:none;"></div>
             </div>
         </div>
@@ -433,8 +434,8 @@ status: "ok" | "error" | "timeout"</div>
                            style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:13px;font-family:Consolas,monospace;"
                            oninput="convertHex()">
                 </div>
-                <button class="btn btn-primary" onclick="convertHex()">Konversi</button>
-                <button class="btn" onclick="pasteFromInspect()">↑ Ambil dari Inspector</button>
+                <button class="btn btn-primary" onclick="convertHex()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M7 7h11l-3-3m3 3-3 3M17 17H6l3 3m-3-3 3-3"/></svg>Konversi</button>
+                <button class="btn" onclick="pasteFromInspect()"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M9 5h6M9 3h6v4H9z"/><path d="M7 5H5v16h14V5h-2M12 11v6m0-6-3 3m3-3 3 3"/></svg>Ambil dari inspector</button>
             </div>
             <div id="convResult" style="display:none;">
                 <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -470,8 +471,11 @@ status: "ok" | "error" | "timeout"</div>
     </a>
     <a class="dock-item active" href="/modbus" aria-current="page" aria-label="Modbus Terminal">
         <span class="dock-label">Modbus Terminal</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="2" y="5" width="6" height="14" rx="2"/>
+            <rect x="16" y="5" width="6" height="14" rx="2"/>
+            <path d="M8 9h8m-3-3 3 3-3 3M16 15H8m3-3-3 3 3 3"/>
+            <path d="M4.5 8h1M18.5 16h1"/>
         </svg>
     </a>
 </nav>

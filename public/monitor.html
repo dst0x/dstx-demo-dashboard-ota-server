@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Serial Monitor · OTA Mertani</title>
+    <title>Serial Monitor · UTIL Mertani</title>
     <link rel="stylesheet" href="/navigation.css">
     <style>
         :root {
@@ -145,10 +145,11 @@
             .terminal-footer { flex-direction: column; }
         }
     </style>
+    <link rel="stylesheet" href="/app-theme.css">
 </head>
 <body>
 <header>
-    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">OTA <span>Mertani</span></h1>
+    <h1><img src="/logo.png" width="48" height="48" alt="Mertani" style="flex-shrink:0;object-fit:contain;">UTIL <span>Mertani</span></h1>
     <div class="header-actions">
         <span style="font-size:13px;color:var(--text-muted);font-weight:500;">MTI2 · Serial Monitor</span>
         <form action="/api/auth/logout" method="post"><button class="btn-logout" type="submit">Keluar</button></form>
@@ -175,8 +176,8 @@
                 <option value="error">Error</option>
             </select>
             <select id="deviceFilter" aria-label="Filter device"><option value="">Semua device</option></select>
-            <button id="pauseButton" class="btn-secondary" type="button">Jeda</button>
-            <button id="clearButton" class="btn-danger" type="button">Bersihkan</button>
+            <button id="pauseButton" class="btn-secondary" type="button"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg><span>Jeda</span></button>
+            <button id="clearButton" class="btn-danger" type="button"><svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>Bersihkan</span></button>
         </div>
 
         <div class="terminal-shell">
@@ -205,7 +206,10 @@
     <a class="dock-item" href="/modbus" aria-label="Modbus Terminal">
         <span class="dock-label">Modbus Terminal</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
+            <rect x="2" y="5" width="6" height="14" rx="2"/>
+            <rect x="16" y="5" width="6" height="14" rx="2"/>
+            <path d="M8 9h8m-3-3 3 3-3 3M16 15H8m3-3-3 3 3 3"/>
+            <path d="M4.5 8h1M18.5 16h1"/>
         </svg>
     </a>
 </nav>
@@ -306,7 +310,7 @@
     [searchInput, levelFilter, deviceFilter].forEach(control => control.addEventListener('input', renderLogs));
     pauseButton.addEventListener('click', () => {
         paused = !paused;
-        pauseButton.textContent = paused ? 'Lanjutkan' : 'Jeda';
+        pauseButton.querySelector('span').textContent = paused ? 'Lanjutkan' : 'Jeda';
         if (!paused) renderLogs();
     });
     clearButton.addEventListener('click', async () => {
