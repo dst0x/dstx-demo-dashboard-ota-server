@@ -55,22 +55,6 @@ const createTables = async () => {
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_ota_download_acks_device_firmware
             ON ota_download_acks(devid, firmware_id);
-
-        CREATE TABLE IF NOT EXISTS modbus_commands (
-            id              BIGSERIAL PRIMARY KEY,
-            devid           VARCHAR(20)  NOT NULL,
-            frame           VARCHAR(200) NOT NULL,
-            description     VARCHAR(255),
-            status          VARCHAR(20)  DEFAULT 'pending',
-            created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-            sent_at         TIMESTAMP,
-            response_frame  VARCHAR(200),
-            response_status VARCHAR(20),
-            responded_at    TIMESTAMP
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_modbus_commands_devid_status
-            ON modbus_commands(devid, status);
     `;
 
     try {

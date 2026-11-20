@@ -36,7 +36,7 @@ function parseTargetDevids(value) {
             .filter(Boolean)
     )];
 
-    if (devids.length === 0 || devids.some(devid => devid !== '*' && !/^[A-Za-z0-9._:-]{1,20}$/.test(devid))) {
+    if (devids.length === 0 || devids.some(devid => devid !== '*' && !/^[1-9]\d{0,19}$/.test(devid))) {
         return null;
     }
     return devids;
