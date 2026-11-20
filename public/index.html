@@ -272,12 +272,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="hardware_target">Target Hardware</label>
-                    <select id="hardware_target" name="hardware_target" required>
-                        <option value="STM32L4P5RGT6">MTI2</option>
-                    </select>
-                </div>
+                <input type="hidden" name="hardware_target" value="STM32L4P5RGT6">
 
                 <div class="form-group full">
                     <label for="target_devids">Target Device</label>
@@ -312,6 +307,12 @@
 </div>
 
 <nav class="mac-dock" aria-label="Navigasi utama">
+    <a class="dock-item" href="/chat" aria-label="Asisten Chat">
+        <span class="dock-label">Asisten</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    </a>
     <a class="dock-item active" href="/" aria-current="page" aria-label="Dashboard OTA">
         <span class="dock-label">Dashboard OTA</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -371,7 +372,6 @@
                             <div class="firmware-info">
                                 <h4>
                                     Versi ${fw.version}
-                                    <span class="badge">${fw.hardware_target}</span>
                                     <span class="badge-mti">.bin siap</span>
                                 </h4>
                                 <p><strong>Catatan:</strong> ${fw.release_notes || 'Tidak ada catatan'}</p>

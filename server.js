@@ -22,6 +22,10 @@ app.get(['/monitor', '/monitor.html'], requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'monitor.html'));
 });
+app.get(['/chat', '/chat.html'], requireAuth, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.sendFile(path.join(__dirname, 'public', 'chat.html'));
+});
 app.get(['/modbus', '/modbus.html'], requireAuth, (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'modbus.html'));
@@ -33,6 +37,7 @@ const otaRoutes = require('./src/routes/ota_routes');
 const { adminRouter: serialAdminRoutes, deviceRouter: serialDeviceRoutes } = require('./src/routes/serial_routes');
 const { adminRouter: modbusAdminRoutes, deviceRouter: modbusDeviceRoutes } = require('./src/routes/modbus_routes');
 const serialPortRoutes = require('./src/routes/serial_port_routes');
+const chatRoutes = require('./src/routes/chat_routes');
 
 app.get('/login', (req, res) => {
     if (readSession(req)) return res.redirect('/');
@@ -57,6 +62,7 @@ app.use('/api/admin', requireAuth, adminRoutes);
 app.use('/api/admin/serial', requireAuth, serialAdminRoutes);
 app.use('/api/admin/modbus', requireAuth, modbusAdminRoutes);
 app.use('/api/admin/serialport', requireAuth, serialPortRoutes);
+app.use('/api/admin/chat', requireAuth, chatRoutes);
 app.use('/api/serial', serialDeviceRoutes);
 app.use('/api/device/modbus', modbusDeviceRoutes);
 app.use('/api/ota', otaRoutes);
