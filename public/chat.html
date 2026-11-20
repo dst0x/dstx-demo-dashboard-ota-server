@@ -122,10 +122,75 @@
         .send-btn svg { width: 16px; height: 16px; }
         .input-hint { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: center; }
 
-        @media (max-width: 600px) {
-            .sidebar { display: none; }
-            .msg { max-width: 90%; }
+        @media (max-width: 600px) { .sidebar { display: none; } .msg { max-width: 90%; } }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 200;
+            background: rgba(15,23,42,.45); backdrop-filter: blur(4px);
+            align-items: center; justify-content: center;
         }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #fff; border-radius: 14px; width: 760px; max-width: 95vw;
+            max-height: 85vh; display: flex; flex-direction: column;
+            box-shadow: 0 24px 60px rgba(15,23,42,.22);
+        }
+        .modal-head {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .modal-head h3 { margin: 0; font-size: 15px; }
+        .modal-close { border: none; background: none; cursor: pointer; font-size: 20px; color: var(--muted); line-height: 1; padding: 2px 6px; border-radius: 6px; }
+        .modal-close:hover { background: var(--bg); }
+        .modal-body { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+        .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
+
+        /* KB form */
+        .kb-form { display: flex; flex-direction: column; gap: 10px; background: var(--bg); border-radius: 10px; padding: 14px; border: 1px solid var(--border); }
+        .kb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .kb-field { display: flex; flex-direction: column; gap: 4px; }
+        .kb-field label { font-size: 11px; font-weight: 600; color: var(--muted); }
+        .kb-field input, .kb-field select, .kb-field textarea {
+            padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+            font-size: 13px; font-family: inherit; outline: none; background: #fff;
+        }
+        .kb-field input:focus, .kb-field select:focus, .kb-field textarea:focus { border-color: var(--primary); }
+        .kb-field textarea { resize: vertical; min-height: 90px; }
+        .btn-sm { padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text); }
+        .btn-sm:hover { border-color: #fdba74; color: var(--primary); }
+        .btn-primary-sm { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-primary-sm:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
+        .btn-danger-sm { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+        .btn-danger-sm:hover { background: #fee2e2; }
+
+        /* KB list */
+        .kb-list { display: flex; flex-direction: column; gap: 8px; }
+        .kb-item {
+            border: 1px solid var(--border); border-radius: 9px; padding: 12px 14px;
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+            background: #fff;
+        }
+        .kb-item-info { flex: 1; min-width: 0; }
+        .kb-item-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+        .kb-item-cat { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; background: var(--primary-light); color: var(--primary); margin-bottom: 4px; }
+        .kb-item-preview { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 500px; }
+        .kb-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .kb-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
+
+        /* History sidebar */
+        .hist-item {
+            display: flex; flex-direction: column; gap: 2px; width: 100%;
+            padding: 8px 10px; border-radius: 8px; border: none; background: none;
+            cursor: pointer; text-align: left; transition: background .12s;
+        }
+        .hist-item:hover { background: var(--primary-light); }
+        .hist-item.active { background: var(--primary-light); }
+        .hist-item-preview { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+        .hist-item.active .hist-item-preview { color: var(--primary); }
+        .hist-item-time { font-size: 10px; color: var(--muted); }
+        .hist-empty { font-size: 11px; color: var(--muted); padding: 4px 10px; }
+        .sidebar-hist { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
     </style>
 </head>
 <body>
@@ -146,6 +211,13 @@
 
     <!-- Sidebar topik -->
     <aside class="sidebar">
+        <div class="sidebar-section">
+            <div class="sidebar-title">Riwayat Chat</div>
+            <div class="sidebar-hist" id="historyList">
+                <div class="hist-empty">Belum ada riwayat.</div>
+            </div>
+        </div>
+        <div class="sidebar-divider"></div>
         <div class="sidebar-section">
             <div class="sidebar-title">Topik Umum</div>
             <button class="topic-btn" onclick="askTopic('Apa itu Mertani Datalogger?')">
@@ -188,6 +260,10 @@
         <div class="sidebar-divider"></div>
         <div class="sidebar-section">
             <div class="sidebar-title">Lainnya</div>
+            <button class="topic-btn" onclick="openKbModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                Kelola Knowledge Base
+            </button>
             <button class="topic-btn" onclick="clearChat()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Bersihkan Chat
@@ -226,6 +302,52 @@
     </div>
 </div>
 
+<!-- Knowledge Base Modal -->
+<div class="modal-overlay" id="kbModal">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>📚 Knowledge Base Asisten</h3>
+            <button class="modal-close" onclick="closeKbModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <!-- Form tambah/edit -->
+            <div class="kb-form">
+                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;" id="kbFormTitle">+ Tambah Knowledge Baru</div>
+                <input type="hidden" id="kbEditId">
+                <div class="kb-row">
+                    <div class="kb-field">
+                        <label>Judul</label>
+                        <input id="kbTitle" type="text" placeholder="Contoh: Sensor Suhu SHT30">
+                    </div>
+                    <div class="kb-field">
+                        <label>Kategori</label>
+                        <input id="kbCategory" type="text" placeholder="Sensor / Produk / SOP / Perusahaan" list="kbCatList">
+                        <datalist id="kbCatList">
+                            <option value="Sensor">
+                            <option value="Produk">
+                            <option value="SOP">
+                            <option value="Perusahaan">
+                            <option value="Firmware">
+                            <option value="Troubleshooting">
+                            <option value="Umum">
+                        </datalist>
+                    </div>
+                </div>
+                <div class="kb-field">
+                    <label>Konten (detail informasi, spesifikasi, langkah-langkah, dll)</label>
+                    <textarea id="kbContent" placeholder="Tulis informasi lengkap di sini. Contoh: register address, cara baca, spesifikasi sensor, prosedur, dll."></textarea>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-sm btn-primary-sm" onclick="saveKnowledge()">Simpan</button>
+                    <button class="btn-sm" id="kbCancelEdit" onclick="cancelKbEdit()" style="display:none;">Batal Edit</button>
+                </div>
+            </div>
+            <!-- List -->
+            <div id="kbList" class="kb-list"><div class="kb-empty">Belum ada knowledge. Tambahkan di atas.</div></div>
+        </div>
+    </div>
+</div>
+
 <nav class="mac-dock" aria-label="Navigasi utama">
     <a class="dock-item active" href="/chat" aria-current="page" aria-label="Asisten Chat">
         <span class="dock-label">Asisten</span>
@@ -257,10 +379,17 @@
 </nav>
 
 <script>
+// ── Session ─────────────────────────────────────────────────
+function newSessionKey() {
+    return 'sess_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+let SESSION_KEY = newSessionKey(); // fresh each page load
+
 // ── State ───────────────────────────────────────────────────
 let hasMessages = false;
 let isStreaming = false;
 const history = []; // { role, content }
+let activeHistKey = null;
 
 function hideWelcome() {
     if (!hasMessages) {
@@ -330,7 +459,7 @@ async function botReply(userText) {
         const res = await fetch('/api/admin/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: history }),
+            body: JSON.stringify({ messages: history, session_key: SESSION_KEY }),
         });
 
         if (!res.ok) {
@@ -371,7 +500,11 @@ async function botReply(userText) {
             }
         }
 
-        if (full) history.push({ role: 'assistant', content: full });
+        if (full) {
+            history.push({ role: 'assistant', content: full });
+            // Refresh history sidebar so new sessions appear
+            loadSessions();
+        }
     } catch (err) {
         removeTyping();
         appendMsg('bot', '⚠️ Gagal menghubungi server: ' + err.message);
@@ -400,10 +533,12 @@ function askTopic(text) {
 
 function clearChat() {
     if (isStreaming) return;
+    SESSION_KEY = newSessionKey();
+    activeHistKey = null;
     history.length = 0;
+    hasMessages = false;
     const wrap = document.getElementById('messages');
     wrap.innerHTML = '';
-    hasMessages = false;
     const welcome = document.createElement('div');
     welcome.className = 'welcome';
     welcome.id = 'welcome';
@@ -419,6 +554,7 @@ function clearChat() {
             <button class="chip" onclick="askTopic('Format frame Modbus RTU')">Frame Modbus</button>
         </div>`;
     wrap.appendChild(welcome);
+    document.querySelectorAll('.hist-item').forEach(el => el.classList.remove('active'));
 }
 
 function autoResize(el) {
@@ -429,6 +565,153 @@ function autoResize(el) {
 function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 }
+
+// ── History sidebar ──────────────────────────────────────────
+function formatTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const diff = Date.now() - d;
+    if (diff < 60000) return 'Baru saja';
+    if (diff < 3600000) return Math.floor(diff / 60000) + ' mnt lalu';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + ' jam lalu';
+    if (diff < 172800000) return 'Kemarin';
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
+async function loadSessions() {
+    const list = document.getElementById('historyList');
+    try {
+        const res = await fetch('/api/admin/chat/sessions');
+        const { sessions } = await res.json();
+        if (!sessions?.length) {
+            list.innerHTML = '<div class="hist-empty">Belum ada riwayat.</div>';
+            return;
+        }
+        list.innerHTML = sessions.map(s => `
+            <button class="hist-item${s.session_key === activeHistKey ? ' active' : ''}"
+                    data-key="${s.session_key}"
+                    onclick="loadSession('${s.session_key}')">
+                <div class="hist-item-preview">${esc(s.preview || 'Percakapan')}</div>
+                <div class="hist-item-time">${formatTime(s.last_message || s.created_at)} · ${s.message_count} pesan</div>
+            </button>`).join('');
+    } catch (_) {
+        list.innerHTML = '<div class="hist-empty">Gagal memuat.</div>';
+    }
+}
+
+async function loadSession(key) {
+    if (isStreaming) return;
+    SESSION_KEY = key;
+    activeHistKey = key;
+    history.length = 0;
+    hasMessages = false;
+
+    const wrap = document.getElementById('messages');
+    wrap.innerHTML = '<div class="hist-empty" style="text-align:center;padding:32px;">Memuat…</div>';
+
+    try {
+        const res = await fetch(`/api/admin/chat/history?session=${key}`);
+        const { messages } = await res.json();
+        wrap.innerHTML = '';
+        for (const m of messages) {
+            history.push({ role: m.role, content: m.content });
+            appendMsg(m.role === 'user' ? 'user' : 'bot', m.content);
+        }
+        if (!messages?.length) {
+            hasMessages = false;
+            const w = document.createElement('div');
+            w.className = 'welcome'; w.id = 'welcome';
+            w.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;">Sesi ini kosong.</p>';
+            wrap.appendChild(w);
+        }
+    } catch (_) {
+        wrap.innerHTML = '<div class="hist-empty" style="text-align:center;padding:32px;color:red;">Gagal memuat.</div>';
+    }
+
+    document.querySelectorAll('.hist-item').forEach(el =>
+        el.classList.toggle('active', el.dataset.key === key));
+}
+
+// ── Knowledge Base CRUD ──────────────────────────────────────
+async function openKbModal() {
+    document.getElementById('kbModal').classList.add('open');
+    await loadKbList();
+}
+function closeKbModal() {
+    document.getElementById('kbModal').classList.remove('open');
+    cancelKbEdit();
+}
+
+async function loadKbList() {
+    const list = document.getElementById('kbList');
+    list.innerHTML = '<div class="kb-empty">Memuat...</div>';
+    try {
+        const res = await fetch('/api/admin/chat/knowledge');
+        const { data } = await res.json();
+        if (!data?.length) { list.innerHTML = '<div class="kb-empty">Belum ada knowledge. Tambahkan di atas.</div>'; return; }
+        list.innerHTML = data.map(k => `
+            <div class="kb-item">
+                <div class="kb-item-info">
+                    <div><span class="kb-item-cat">${esc(k.category)}</span></div>
+                    <div class="kb-item-title">${esc(k.title)}</div>
+                    <div class="kb-item-preview">${esc(k.content)}</div>
+                </div>
+                <div class="kb-item-actions">
+                    <button class="btn-sm" onclick="editKb(${k.id},'${esc(k.title)}','${esc(k.category)}',${JSON.stringify(k.content)})">Edit</button>
+                    <button class="btn-sm btn-danger-sm" onclick="deleteKb(${k.id})">Hapus</button>
+                </div>
+            </div>`).join('');
+    } catch (e) {
+        list.innerHTML = '<div class="kb-empty">Gagal memuat.</div>';
+    }
+}
+
+async function saveKnowledge() {
+    const id = document.getElementById('kbEditId').value;
+    const title = document.getElementById('kbTitle').value.trim();
+    const category = document.getElementById('kbCategory').value.trim() || 'Umum';
+    const content = document.getElementById('kbContent').value.trim();
+    if (!title || !content) { alert('Judul dan konten wajib diisi.'); return; }
+
+    const url = id ? `/api/admin/chat/knowledge/${id}` : '/api/admin/chat/knowledge';
+    const method = id ? 'PUT' : 'POST';
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, category, content }) });
+    cancelKbEdit();
+    await loadKbList();
+}
+
+function editKb(id, title, category, content) {
+    document.getElementById('kbEditId').value = id;
+    document.getElementById('kbTitle').value = title;
+    document.getElementById('kbCategory').value = category;
+    document.getElementById('kbContent').value = content;
+    document.getElementById('kbFormTitle').textContent = '✏️ Edit Knowledge';
+    document.getElementById('kbCancelEdit').style.display = '';
+    document.getElementById('kbTitle').focus();
+}
+
+function cancelKbEdit() {
+    document.getElementById('kbEditId').value = '';
+    document.getElementById('kbTitle').value = '';
+    document.getElementById('kbCategory').value = '';
+    document.getElementById('kbContent').value = '';
+    document.getElementById('kbFormTitle').textContent = '+ Tambah Knowledge Baru';
+    document.getElementById('kbCancelEdit').style.display = 'none';
+}
+
+async function deleteKb(id) {
+    if (!confirm('Hapus knowledge ini?')) return;
+    await fetch(`/api/admin/chat/knowledge/${id}`, { method: 'DELETE' });
+    await loadKbList();
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Close modal on overlay click ─────────────────────────────
+document.getElementById('kbModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeKbModal(); });
+
+// ── Init ─────────────────────────────────────────────────────
+loadSessions();
 </script>
 </body>
 </html>
