@@ -1,5 +1,11 @@
 body { padding-bottom: 112px !important; }
 
+@view-transition {
+    navigation: auto;
+}
+
+header { view-transition-name: app-header; }
+
 .mac-dock {
     position: fixed;
     left: 50%;
@@ -15,6 +21,8 @@ body { padding-bottom: 112px !important; }
     backdrop-filter: blur(18px) saturate(145%);
     -webkit-backdrop-filter: blur(18px) saturate(145%);
     transform: translateX(-50%);
+    view-transition-name: app-dock;
+    will-change: transform;
 }
 
 .dock-item {
@@ -57,6 +65,42 @@ body { padding-bottom: 112px !important; }
     background: #e85d1f;
 }
 
+::view-transition-old(root) {
+    animation: page-out 140ms ease-in both;
+}
+
+::view-transition-new(root) {
+    animation: page-in 240ms cubic-bezier(.22, .8, .24, 1) both;
+}
+
+::view-transition-group(app-header),
+::view-transition-group(app-dock) {
+    animation-duration: 260ms;
+    animation-timing-function: cubic-bezier(.22, .8, .24, 1);
+}
+
+body > *:not(.mac-dock) {
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+body.nav-leaving > *:not(.mac-dock) {
+    opacity: 0;
+    transform: translateY(-3px);
+}
+
+body.nav-leaving .mac-dock {
+    pointer-events: none;
+}
+
+@keyframes page-out {
+    to { opacity: 0; transform: translateY(-4px) scale(.997); }
+}
+
+@keyframes page-in {
+    from { opacity: 0; transform: translateY(6px) scale(.997); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .dock-label {
     position: absolute;
     bottom: calc(100% + 11px);
@@ -86,6 +130,20 @@ body { padding-bottom: 112px !important; }
     .dock-item { width: 44px; height: 44px; }
 }
 
+@media (hover: none), (pointer: coarse) {
+    .dock-label { display: none; }
+    .dock-item:hover {
+        transform: none;
+        box-shadow: none;
+    }
+    .dock-item.active:hover {
+        color: #fff;
+        background: linear-gradient(145deg, #f47a42, #e85d1f);
+        box-shadow: 0 9px 22px rgba(232, 93, 31, .3);
+    }
+    .dock-item:active { transform: scale(.94); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .dock-item, .dock-label { transition: none; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
