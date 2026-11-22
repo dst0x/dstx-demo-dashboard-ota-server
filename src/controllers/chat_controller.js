@@ -18,7 +18,14 @@ Panduan menjawab:
 - Gunakan bullet points atau numbered list untuk langkah-langkah
 - Sertakan contoh kode atau nilai hex jika relevan
 - Jika tidak tahu jawabannya, arahkan ke tim Mertani
-- Jawaban singkat dan to the point`;
+- Jawaban singkat dan to the point
+
+PENTING - Akurasi data teknis:
+- JANGAN PERNAH mengubah, mengarang, atau memperkirakan nilai numerik seperti register address, range, skala, satuan, atau spesifikasi sensor
+- Kutip data teknis PERSIS seperti yang tertulis di dokumen referensi
+- Jika data tidak ditemukan di dokumen, katakan "data tidak tersedia di dokumen" daripada menebak
+- Untuk tabel register Modbus: salin address (0x0001, 0x0009, dll), operation, dan deskripsi persis dari datasheet
+- Jangan menggabungkan atau mencampur data dari dokumen yang berbeda`;
 
 // ── Knowledge Base helpers ──────────────────────────────────
 
@@ -97,7 +104,7 @@ const chatStream = async (req, res) => {
         let systemPrompt = await buildSystemPrompt();
         if (fileHits.length) {
             systemPrompt += '\n\n=== DOKUMEN RELEVAN ===\n';
-            systemPrompt += 'Gunakan kutipan dokumen berikut sebagai referensi utama untuk menjawab. Parafrase dan rangkum dengan bahasa yang jelas.\n';
+            systemPrompt += 'Gunakan kutipan dokumen berikut sebagai SATU-SATUNYA sumber data teknis. Kutip angka, address, spesifikasi PERSIS seperti tertulis. JANGAN modifikasi nilai numerik.\n';
             for (const hit of fileHits) {
                 systemPrompt += `\n📄 ${hit.original_name} (${hit.file_type.toUpperCase()})\n${hit.excerpt}\n`;
             }

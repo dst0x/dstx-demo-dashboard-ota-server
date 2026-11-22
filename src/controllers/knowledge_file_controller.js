@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const pool = require('../database/db');
+const { isOllamaReady, embedText, chunkText } = require('../services/embedding_service');
 
 async function ocrPdf(filePath) {
     const Tesseract = require('tesseract.js');
@@ -9,7 +10,7 @@ async function ocrPdf(filePath) {
     fs.mkdirSync(tmpDir, { recursive: true });
 
     try {
-        execSync(`pdftoppm -png -r 300 -l 30 "${filePath}" "${tmpDir}/page"`, { timeout: 120000 });
+        execSync(`pdftoppm -png -r 400 -l 30 -gray "${filePath}" "${tmpDir}/page"`, { timeout: 180000 });
         const images = fs.readdirSync(tmpDir)
             .filter(f => f.endsWith('.png'))
             .sort()
@@ -30,15 +31,57 @@ async function ocrPdf(filePath) {
     }
 }
 
+function layoutRender(pageData) {
+    return pageData.getTextContent().then(textContent => {
+        if (!textContent.items.length) return '';
+
+        const fontSize = textContent.items.reduce((s, it) => s + Math.abs(it.transform[3] || 12), 0) / textContent.items.length;
+        const yBucket = Math.max(fontSize * 0.6, 4);
+
+        const rows = {};
+        for (const item of textContent.items) {
+            if (!item.str) continue;
+            const y = Math.round(item.transform[5] / yBucket) * yBucket;
+            if (!rows[y]) rows[y] = [];
+            rows[y].push({ x: item.transform[4], text: item.str, w: item.width || 0 });
+        }
+
+        const sortedYs = Object.keys(rows).map(Number).sort((a, b) => b - a);
+        const lines = [];
+
+        for (const y of sortedYs) {
+            const items = rows[y].sort((a, b) => a.x - b.x);
+            let line = '';
+            let lastEnd = 0;
+            for (const item of items) {
+                const gap = item.x - lastEnd;
+                if (gap > fontSize * 3 && line) line += ' | ';
+                else if (gap > fontSize * 0.3 && line) line += ' ';
+                line += item.text;
+                lastEnd = item.x + item.w;
+            }
+            if (line.trim()) lines.push(line.trim());
+        }
+
+        return lines.join('\n');
+    });
+}
+
 async function extractPdf(filePath) {
     const pdfParse = require('pdf-parse');
     const buffer = fs.readFileSync(filePath);
-    const data = await pdfParse(buffer);
-    const text = (data.text || '').replace(/\x00/g, '').trim();
-    if (text.length >= 100) return text;
-    console.log(`[KnowledgeFile] pdf-parse got ${text.length} chars, falling back to OCR: ${filePath}`);
+
+    const layoutData = await pdfParse(buffer, { pagerender: layoutRender });
+    const layoutText = (layoutData.text || '').replace(/\x00/g, '').trim();
+    if (layoutText.length >= 100) return layoutText;
+
+    const plainData = await pdfParse(buffer);
+    const plainText = (plainData.text || '').replace(/\x00/g, '').trim();
+    if (plainText.length >= 100) return plainText;
+
+    console.log(`[KnowledgeFile] pdf-parse got ${plainText.length} chars, falling back to OCR: ${filePath}`);
     const ocrText = await ocrPdf(filePath);
-    return ocrText || text;
+    return ocrText || plainText;
 }
 
 async function extractDocx(filePath) {
@@ -122,11 +165,36 @@ const uploadKnowledgeFile = async (req, res) => {
              RETURNING id, original_name, file_type, file_size, created_at`,
             [originalname, ext, size, filePath, text]
         );
+        const fileId = result.rows[0].id;
         res.status(201).json({ success: true, data: result.rows[0] });
+
+        // Generate embeddings in background (non-blocking)
+        setImmediate(() => generateChunkEmbeddings(fileId, text).catch(e =>
+            console.error('[Embed] background error:', e.message)
+        ));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
+
+async function generateChunkEmbeddings(fileId, text) {
+    if (!await isOllamaReady()) return;
+    const chunks = chunkText(text);
+    for (let i = 0; i < chunks.length; i++) {
+        try {
+            const vector = await embedText(chunks[i].text);
+            await pool.query(
+                `INSERT INTO knowledge_chunks (file_id, chunk_index, chunk_text, embedding)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT DO NOTHING`,
+                [fileId, i, chunks[i].text, JSON.stringify(vector)]
+            );
+        } catch (e) {
+            console.error(`[Embed] chunk ${i} error:`, e.message);
+        }
+    }
+    console.log(`[Embed] file ${fileId}: ${chunks.length} chunks embedded`);
+}
 
 // ── List ────────────────────────────────────────────────────
 
@@ -195,9 +263,9 @@ function kwToRegex(kw) {
         .replace(/(\d)([a-zA-Z])/g, '$1[^a-zA-Z0-9]?$2');
 }
 
-function extractExcerpt(text, kwRegexes, maxLen = 1200) {
-    const CHUNK = 600;
-    const STEP = 300;
+function extractExcerpt(text, kwRegexes, maxLen = 2500) {
+    const CHUNK = 1000;
+    const STEP = 400;
 
     let bestScore = -1;
     let bestIdx = 0;
@@ -227,22 +295,38 @@ function extractExcerpt(text, kwRegexes, maxLen = 1200) {
     return text.slice(start, end).replace(/\s+/g, ' ').trim().slice(0, maxLen);
 }
 
-async function searchKnowledgeFiles(query, limit = 4) {
-    if (!query || query.trim().length < 2) return [];
+async function vectorSearch(query, limit = 6) {
+    try {
+        const queryVector = await embedText(query);
+        const result = await pool.query(
+            `SELECT kf.id, kf.original_name, kf.file_type, kc.chunk_text,
+                    1 - (kc.embedding <=> $1::vector) AS similarity
+             FROM knowledge_chunks kc
+             JOIN knowledge_files kf ON kf.id = kc.file_id
+             ORDER BY kc.embedding <=> $1::vector
+             LIMIT $2`,
+            [JSON.stringify(queryVector), limit]
+        );
+        return result.rows.map(row => ({
+            original_name: row.original_name,
+            file_type: row.file_type,
+            excerpt: row.chunk_text,
+            similarity: parseFloat(row.similarity).toFixed(3),
+            source: 'vector',
+        }));
+    } catch (e) {
+        console.error('[VectorSearch]', e.message);
+        return null;
+    }
+}
 
+async function keywordSearch(query, limit = 6) {
     const keywords = extractKeywords(query);
     if (!keywords.length) return [];
-
-    // Build JS regexes (case-insensitive, fuzzy separator) for excerpt scoring
     const kwRegexes = keywords.map(kw => new RegExp(kwToRegex(kw), 'i'));
-
-    // Build PostgreSQL regex patterns for fuzzy matching
     const pgPatterns = keywords.map(kw => kwToRegex(kw));
-
     try {
         const conditions = pgPatterns.map((_, i) => `extracted_text ~* $${i + 1}`);
-        const params = pgPatterns;
-
         const result = await pool.query(
             `SELECT id, original_name, file_type, extracted_text,
                     (${pgPatterns.map((_, i) => `CASE WHEN extracted_text ~* $${i + 1} THEN 1 ELSE 0 END`).join(' + ')}) AS score
@@ -250,18 +334,35 @@ async function searchKnowledgeFiles(query, limit = 4) {
              WHERE ${conditions.join(' OR ')}
              ORDER BY score DESC
              LIMIT ${limit}`,
-            params
+            pgPatterns
         );
-
         return result.rows.map(row => ({
             original_name: row.original_name,
             file_type: row.file_type,
             excerpt: extractExcerpt(row.extracted_text, kwRegexes),
+            source: 'keyword',
         }));
     } catch (e) {
-        console.error('[KnowledgeSearch]', e.message);
+        console.error('[KeywordSearch]', e.message);
         return [];
     }
+}
+
+async function searchKnowledgeFiles(query, limit = 6) {
+    if (!query || query.trim().length < 2) return [];
+
+    // Coba vector search dulu kalau Ollama ready
+    if (await isOllamaReady()) {
+        const vectorResults = await vectorSearch(query, limit);
+        if (vectorResults && vectorResults.length > 0) {
+            console.log(`[Search] vector: ${vectorResults.length} hits`);
+            return vectorResults;
+        }
+    }
+
+    // Fallback ke keyword search
+    console.log('[Search] fallback to keyword');
+    return keywordSearch(query, limit);
 }
 
 // ── Re-extract ──────────────────────────────────────────────
