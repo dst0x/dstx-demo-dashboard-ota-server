@@ -298,16 +298,20 @@ function extractExcerpt(text, kwRegexes, maxLen = 2500) {
 async function vectorSearch(query, limit = 6) {
     try {
         const queryVector = await embedText(query);
+        // DISTINCT ON file: ambil chunk terbaik per file, bukan per chunk
         const result = await pool.query(
-            `SELECT kf.id, kf.original_name, kf.file_type, kc.chunk_text,
+            `SELECT DISTINCT ON (kf.id)
+                    kf.id, kf.original_name, kf.file_type, kc.chunk_text,
                     1 - (kc.embedding <=> $1::vector) AS similarity
              FROM knowledge_chunks kc
              JOIN knowledge_files kf ON kf.id = kc.file_id
-             ORDER BY kc.embedding <=> $1::vector
+             ORDER BY kf.id, kc.embedding <=> $1::vector
              LIMIT $2`,
-            [JSON.stringify(queryVector), limit]
+            [JSON.stringify(queryVector), limit * 3]
         );
-        return result.rows.map(row => ({
+        // Sort by similarity descending and take top limit
+        const rows = [...result.rows].sort((a, b) => b.similarity - a.similarity).slice(0, limit);
+        return rows.map(row => ({
             original_name: row.original_name,
             file_type: row.file_type,
             excerpt: row.chunk_text,
@@ -319,6 +323,7 @@ async function vectorSearch(query, limit = 6) {
         return null;
     }
 }
+
 
 async function keywordSearch(query, limit = 6) {
     const keywords = extractKeywords(query);
