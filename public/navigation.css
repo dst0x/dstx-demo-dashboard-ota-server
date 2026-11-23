@@ -79,19 +79,6 @@ header { view-transition-name: app-header; }
     animation-timing-function: cubic-bezier(.22, .8, .24, 1);
 }
 
-body > *:not(.mac-dock) {
-    transition: opacity 120ms ease, transform 120ms ease;
-}
-
-body.nav-leaving > *:not(.mac-dock) {
-    opacity: 0;
-    transform: translateY(-3px);
-}
-
-body.nav-leaving .mac-dock {
-    pointer-events: none;
-}
-
 @keyframes page-out {
     to { opacity: 0; transform: translateY(-4px) scale(.997); }
 }

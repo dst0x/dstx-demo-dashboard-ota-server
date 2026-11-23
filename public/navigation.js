@@ -19,17 +19,8 @@
             else item.removeAttribute('aria-current');
         });
 
-        // Browser modern menangani perpindahan melalui CSS View Transitions.
-        // Fallback ini memberi fade singkat pada browser yang belum mendukungnya.
-        const supportsCrossDocumentTransition = 'onpageswap' in window;
-        if (!supportsCrossDocumentTransition) {
-            event.preventDefault();
-            document.body.classList.add('nav-leaving');
-            window.setTimeout(() => window.location.assign(target.href), 120);
-        }
+        // Biarkan link berpindah langsung. Browser yang mendukung akan memakai
+        // CSS View Transitions; browser lain melakukan navigasi normal tanpa delay.
     });
 
-    window.addEventListener('pageshow', () => {
-        document.body.classList.remove('nav-leaving');
-    });
 })();
