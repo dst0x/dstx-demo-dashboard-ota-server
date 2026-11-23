@@ -12,6 +12,10 @@ data/
 storage/firmwares/*
 !storage/firmwares/.gitkeep
 
+# Knowledge files (PDF, DOCX, dll — disimpan di DB, tidak perlu di repo)
+uploads/knowledge/*
+!uploads/knowledge/.gitkeep
+
 # System files
 .DS_Store
 Thumbs.db
